@@ -150,14 +150,16 @@ class DBConnection:
             sql = sql.rstrip(", ")
             try:
                 cursor.execute(sql)
+                self.conn.commit()
             except Exception as e:
+                self.conn.rollback()
                 raise Error(e.__str__(), "insert 오류")
-            self.conn.commit()
+
             return True
 
-    def delete(self, table: str, order: dict = {}) -> bool:
+    def delete(self, table: str, order: list = [()]) -> bool:
         '''
-        delete(table="test", order="{"id": 1, "id2": "test"})
+        delete(table="test", order="[("id", "=", 1), ("id2", "=", "test"))
         :param table:
         :param order: default = {}
         :return: bool
@@ -168,18 +170,18 @@ class DBConnection:
             raise Error(message="order가 비어있습니다.", hint="order")
         else:
             sql = f"delete from {table} where"
-            for condition, value in order.items():
-                if type(value) == type("v"):
-                    sql += f" {condition}='{value}' AND"
+            for c, o, v in order:
+                if type(v) == type("v"):
+                    sql += f" {c}{o}'{v}' AND"
                 else:
-                    sql += f" {condition}={value} AND"
+                    sql += f" {c}{o}{v} AND"
             sql = sql.rstrip(" AND")
         try:
             cursor.execute(sql)
+            self.conn.commit()
         except Exception as e:
+            self.conn.rollback()
             raise Error(e.__str__(), "delete 오류")
-
-        self.conn.commit()
         return True
 
     def update(self, table: str, condition: list = [], values: list = [], order: list = [()]) -> bool:
@@ -227,9 +229,10 @@ class DBConnection:
             sql = sql.rstrip(" AND")
             try:
                 cursor.execute(sql)
+                self.conn.commit()
             except Exception as e:
+                self.conn.rollback()
                 raise Error(e.__str__(), "udpate 오류")
-            self.conn.commit()
             return True
 
     def run(self):
@@ -242,15 +245,19 @@ class DBConnection:
             if db_shared_dict["func"] == "select":
                 print(db_shared_dict)
                 # select 로직 작성
+                # self.select(db_shared_dict["table"], db_shared_dict["condition"], db_shared_dict["order"])
             elif db_shared_dict["func"] == "insert":
                 print(db_shared_dict)
                 # insert 로직 작성
+                # self.insert(db_shared_dict["table"], db_shared_dict["condition"], db_shared_dict["values"])
             elif db_shared_dict["func"] == "update":
                 print(db_shared_dict)
                 # update 로직 작성
+                # self.update(db_shared_dict["table"], db_shared_dict["condition"], db_shared_dict["values"], db_shared_dict["order"])
             elif db_shared_dict["func"] == "delete":
                 print(db_shared_dict)
                 # delete 로직 작성
+                # self.delete(db_shared_dict["table"], db_shared_dict["order"])
             else:
                 print("None")
                 # 그 외 상황 로직 작성
