@@ -1,22 +1,9 @@
 from DBConnection import *
 from PoseEstimation import PoseEstimation
-
 from multiprocessing import Process, shared_memory, Semaphore
 import pickle
-import random
 import numpy as np
 import time
-
-def test(shared_memory_name, semaphore):
-
-    db_shared_memory = shared_memory.SharedMemory(name=shared_memory_name)
-
-    semaphore.acquire()
-    db_shared_bytes = db_shared_memory.buf.tobytes()
-    db_shared_dict = pickle.loads(db_shared_bytes)
-    db_shared_dict["func"] = random.choice(["select", "insert", "update", "delete"])
-    semaphore.release()
-    time.sleep(0.5)
 
 if __name__ == "__main__":
 

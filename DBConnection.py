@@ -1,7 +1,5 @@
-from multiprocessing import Semaphore, shared_memory, sharedctypes
-import ctypes
+from multiprocessing import Semaphore, shared_memory
 import time
-import random
 import pickle
 import pymysql as sql
 
