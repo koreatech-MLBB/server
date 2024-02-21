@@ -1,5 +1,6 @@
 from multiprocessing import Semaphore, shared_memory
 import time
+import random
 import pickle
 import pymysql as sql
 
@@ -241,27 +242,33 @@ class DBConnection:
             db_shared_bytes = self.shared_memory.buf.tobytes()
             db_shared_dict = pickle.loads(db_shared_bytes)
             if db_shared_dict["func"] == "select":
-                print(db_shared_dict)
+                pass
+                # print(db_shared_dict)
                 # select 로직 작성
-                # self.select(db_shared_dict["table"], db_shared_dict["condition"], db_shared_dict["order"])
+                # result = self.select(db_shared_dict["table"], db_shared_dict["condition"], db_shared_dict["order"])
+                # db_shared_dict["result"].append(result)
             elif db_shared_dict["func"] == "insert":
-                print(db_shared_dict)
+                pass
+                # print(db_shared_dict)
                 # insert 로직 작성
                 # self.insert(db_shared_dict["table"], db_shared_dict["condition"], db_shared_dict["values"])
             elif db_shared_dict["func"] == "update":
-                print(db_shared_dict)
+                pass
+                # print(db_shared_dict)
                 # update 로직 작성
                 # self.update(db_shared_dict["table"], db_shared_dict["condition"], db_shared_dict["values"], db_shared_dict["order"])
             elif db_shared_dict["func"] == "delete":
-                print(db_shared_dict)
+                pass
+                # print(db_shared_dict)
                 # delete 로직 작성
                 # self.delete(db_shared_dict["table"], db_shared_dict["order"])
             else:
-                print("None")
+                pass
+                # print("None")
                 # 그 외 상황 로직 작성
-            # db_shared_dict["func"] = random.choice(["select", "insert", "update", "delete"])
-            # db_shared_bytes = pickle.dumps(db_shared_dict)
-            # self.shared_memory.buf[:len(db_shared_bytes)] = db_shared_bytes
+            db_shared_dict["func"] = random.choice(["select", "insert", "update", "delete"])
+            db_shared_bytes = pickle.dumps(db_shared_dict)
+            self.shared_memory.buf[:len(db_shared_bytes)] = db_shared_bytes
             # 위 작업이 끝난 후 공유 메모리를 비우는 로직 작성
             self.semaphore.release()
-            time.sleep(0.5)
+            # time.sleep(0.5)
