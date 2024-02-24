@@ -2,29 +2,50 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from PoseVal import pose_val
+from multiprocessing import Semaphore, shared_memory
+from threading import Thread, Lock
 
 class PoseEstimation:
-    def __init__(self, min_detection_confidence: float, min_tracking_confidence: float, camNum: int):
+    def __init__(self, min_detection_confidence: float, min_tracking_confidence: float, cam: cv2.VideoCapture, shared_memory: np.ndarray, lock: Lock):
         self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(min_detection_confidence = min_detection_confidence, min_tracking_confidence = min_tracking_confidence)
+        self.pose = self.mp_pose.Pose(min_detection_confidence=min_detection_confidence, min_tracking_confidence=min_tracking_confidence)
         self.mp_drawing = mp.solutions.drawing_utils
-        self.cap = cv2.VideoCapture(camNum)
+        self.cap = cam
+        self.lock = lock
+        self.shared_memory = shared_memory
+        # self.shared_memory = shared_memory.SharedMemory(name=shared_memory_name)
 
     def run(self):
-        while self.cap.isOpened():
-            ret, frame = self.cap.read()
+        # print("ttset")
+        # print(self.cap.isOpened())
+        # while self.cap.isOpened():
+        while True:
+            # ret, frame = self.cap.read()
+
+            # print(type(frame))
 
             # Recolor image to RGB
-            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             # image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
-            image.flags.writeable = False
+            # image.flags.writeable = False
 
             # Make detection
+            # self.semaphore.acquire()
+            with self.lock:
+                image = np.copy(self.shared_memory)
+            # self.semaphore.release()
+
+            # print(image)
+            # with self.pose as pose:
+
             results = self.pose.process(image)
+            print(results)
 
             # Recolor back to BGR
             image.flags.writeable = True
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+
 
             # Extract landmarks
             try:
@@ -33,6 +54,8 @@ class PoseEstimation:
                 coordinates = {}
                 for name, val in pose_val.items():
                     coordinates[name] = [round(landmarks[pose_val[name]].x, 3), round(landmarks[pose_val[name]].y, 3)]
+
+                print(coordinates)
 
                 # calculate angle
                 angle = self.calculate_angle(coordinates["LEFT_SHOULDER"], coordinates["LEFT_ELBOW"], coordinates["LEFT_WRIST"])
@@ -48,16 +71,16 @@ class PoseEstimation:
                 print(e)
 
                 # Render detections
-            self.mp_drawing.draw_landmarks(image, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS,
-                                      self.mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
-                                      self.mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2))
+            # self.mp_drawing.draw_landmarks(image, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS,
+            #                           self.mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
+            #                           self.mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2))
+            #
+            # cv2.imshow('Mediapipe Feed', image)
 
-            cv2.imshow('Mediapipe Feed', image)
-
-            if cv2.waitKey(10) & 0xFF == ord('q'):
-                self.cap.release()
-                cv2.destroyAllWindows()
-                break
+            # if cv2.waitKey(10) & 0xFF == ord('q'):
+            #     self.cap.release()
+            #     cv2.destroyAllWindows()
+            #     break
 
     def calculate_angle(self, a, b, c):
         a = np.array(a)  # First
