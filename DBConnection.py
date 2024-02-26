@@ -1,4 +1,4 @@
-from multiprocessing import Semaphore, shared_memory
+from multiprocessing import shared_memory, Semaphore
 import time
 import random
 import pickle

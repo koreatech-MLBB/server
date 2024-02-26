@@ -2,16 +2,19 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from PoseVal import pose_val
-from multiprocessing import Semaphore, shared_memory
-from threading import Thread, Lock
+from multiprocessing import Semaphore, shared_memory, Lock, Process
+# from threading import Thread, Lock
 
 class PoseEstimation:
-    def __init__(self, min_detection_confidence: float, min_tracking_confidence: float, cam: cv2.VideoCapture, shared_memory: np.ndarray, lock: Lock):
+    def __init__(self, min_detection_confidence: float, min_tracking_confidence: float, shared_memory: np.ndarray, semaphore: Semaphore):
+
+
         self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(min_detection_confidence=min_detection_confidence, min_tracking_confidence=min_tracking_confidence)
+        # self.pose = self.mp_pose.Pose(min_detection_confidence=min_detection_confidence, min_tracking_confidence=min_tracking_confidence)
+        self.min_detection_confidence = min_detection_confidence
+        self.min_tracking_confidence = min_tracking_confidence
         self.mp_drawing = mp.solutions.drawing_utils
-        self.cap = cam
-        self.lock = lock
+        self.semaphore = semaphore
         self.shared_memory = shared_memory
         # self.shared_memory = shared_memory.SharedMemory(name=shared_memory_name)
 
@@ -20,6 +23,7 @@ class PoseEstimation:
         # print(self.cap.isOpened())
         # while self.cap.isOpened():
         while True:
+            print("test")
             # ret, frame = self.cap.read()
 
             # print(type(frame))
@@ -30,16 +34,15 @@ class PoseEstimation:
             # image.flags.writeable = False
 
             # Make detection
-            # self.semaphore.acquire()
-            with self.lock:
-                image = np.copy(self.shared_memory)
-            # self.semaphore.release()
+            self.semaphore.acquire()
+            image = np.copy(self.shared_memory)
+            self.semaphore.release()
 
-            # print(image)
+            print(image)
             # with self.pose as pose:
-
-            results = self.pose.process(image)
-            print(results)
+            with self.mp_pose.Pose(min_detection_confidence=self.min_detection_confidence, min_tracking_confidence=self.min_tracking_confidence) as pose:
+                results = pose.process(image)
+                print(results)
 
             # Recolor back to BGR
             image.flags.writeable = True
