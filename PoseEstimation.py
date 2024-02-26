@@ -3,6 +3,7 @@ import mediapipe as mp
 import numpy as np
 from PoseVal import pose_val
 from multiprocessing import Semaphore, shared_memory, Lock, Process
+import time
 # from threading import Thread, Lock
 
 class PoseEstimation:
@@ -10,7 +11,7 @@ class PoseEstimation:
 
 
         self.mp_pose = mp.solutions.pose
-        # self.pose = self.mp_pose.Pose(min_detection_confidence=min_detection_confidence, min_tracking_confidence=min_tracking_confidence)
+        self.pose = self.mp_pose.Pose(min_detection_confidence=min_detection_confidence, min_tracking_confidence=min_tracking_confidence)
         self.min_detection_confidence = min_detection_confidence
         self.min_tracking_confidence = min_tracking_confidence
         self.mp_drawing = mp.solutions.drawing_utils
@@ -23,7 +24,9 @@ class PoseEstimation:
         # print(self.cap.isOpened())
         # while self.cap.isOpened():
         while True:
-            print("test")
+            start_time = time.time()
+            # print(time.ctime())
+            # print("test")
             # ret, frame = self.cap.read()
 
             # print(type(frame))
@@ -34,23 +37,31 @@ class PoseEstimation:
             # image.flags.writeable = False
 
             # Make detection
-            self.semaphore.acquire()
-            image = np.copy(self.shared_memory)
-            self.semaphore.release()
+            # self.semaphore.acquire()
 
-            print(image)
+            with self.semaphore:
+                image = np.copy(self.shared_memory)
+            # self.semaphore.release()
+
+
+            # print(image)
+
             # with self.pose as pose:
-            with self.mp_pose.Pose(min_detection_confidence=self.min_detection_confidence, min_tracking_confidence=self.min_tracking_confidence) as pose:
-                results = pose.process(image)
-                print(results)
+            # with self.mp_pose.Pose(min_detection_confidence=self.min_detection_confidence, min_tracking_confidence=self.min_tracking_confidence) as pose:
+            try:
+
+                results = self.pose.process(image)
+                # print(results)
+
+            except Exception as e:
+                print(e)
 
             # Recolor back to BGR
-            image.flags.writeable = True
-            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
-
+            # image.flags.writeable = True
+            # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
             # Extract landmarks
+
             try:
                 landmarks = results.pose_landmarks.landmark
                 # Get coordinates
@@ -61,14 +72,14 @@ class PoseEstimation:
                 print(coordinates)
 
                 # calculate angle
-                angle = self.calculate_angle(coordinates["LEFT_SHOULDER"], coordinates["LEFT_ELBOW"], coordinates["LEFT_WRIST"])
+                # angle = self.calculate_angle(coordinates["LEFT_SHOULDER"], coordinates["LEFT_ELBOW"], coordinates["LEFT_WRIST"])
                 # for x, y in coordinates.items():
                 #     print(x, y)
 
                 # Visualize angle
-                cv2.putText(image, str(angle),
-                            tuple(np.multiply(coordinates["LEFT_ELBOW"], [640, 480]).astype(int)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
+                # cv2.putText(image, str(angle),
+                #             tuple(np.multiply(coordinates["LEFT_ELBOW"], [640, 480]).astype(int)),
+                #             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
 
             except Exception as e:
                 print(e)
@@ -84,6 +95,8 @@ class PoseEstimation:
             #     self.cap.release()
             #     cv2.destroyAllWindows()
             #     break
+            end_time = time.time()
+            print(end_time - start_time)
 
     def calculate_angle(self, a, b, c):
         a = np.array(a)  # First
@@ -103,6 +116,3 @@ class PoseEstimation:
         b = np.array(b)
         distance = np.linalg.norm(a - b)
         return distance
-
-# pe = PoseEstimation(min_detection_confidence=0.5, min_tracking_confidence=0.5, camNum=0)
-# pe.run()
