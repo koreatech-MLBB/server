@@ -82,12 +82,12 @@ if __name__ == "__main__":
     pe_process.start()
     #     # db_process.join()
     # p.join()
-    pe_process.join()
+    # pe_process.join()
     # except Exception as e:
     #     print(f"예외 발생 {e}")
 
     # pe.run()
-    # for p in procs:
-    #     p.join()
+    for p in procs:
+        p.join()
 
     # pe = pe = PoseEstimation(min_detection_confidence=0.5, min_tracking_confidence=0.5, camNum=0)
