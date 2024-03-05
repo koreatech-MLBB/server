@@ -41,11 +41,19 @@ if __name__ == "__main__":
     
 
     # image 공유 메모리 생성
-    img_shared_frame = shared_memory.SharedMemory(create=True, name="img_shared", size=921600)
-    # img_shared_frame = shared_memory.SharedMemory(name="img_shared", size=921600)
+    img_size = (480, 640)
+    img_shared_frame = shared_memory.SharedMemory(create=True, name="img_shared", size=img_size[0]*img_size[1]*3*30)
+    # img_shared_frame = shared_memory.SharedMemory(name="img_shared", size=img_size[0]*img_size[1]*3*30)
     #
-    shared_frame = np.ndarray(shape=(480, 640, 3), dtype=np.uint8, buffer=img_shared_frame.buf)
-    
+    shared_frame_push_idx = shared_memory.SharedMemory(create=True, name="shared_frame_push_idx")
+    shared_frame_pop_idx = shared_memory.SharedMemory(create=True, name="shared_frame_pop_idx")
+    shared_frame = np.ndarray(shape=(480, 640, 3, 30), dtype=np.uint8, buffer=img_shared_frame.buf)
+
+    frame_push_idx = shared_frame_push_idx.buf.cast('i')
+    frame_push_idx[0] = 0
+
+    frame_pop_idx = shared_frame_pop_idx.buf.cast('i')
+    frame_pop_idx[0] = 0
 
     # cam 객체 생성
 

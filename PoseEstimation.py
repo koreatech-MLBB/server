@@ -2,7 +2,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from PoseVal import pose_val
-from multiprocessing import Semaphore, shared_memory, Lock, Process
+from multiprocessing import Semaphore, Manager, shared_memory, Lock, Process
 import time
 # from threading import Thread, Lock
 
