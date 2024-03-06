@@ -2,22 +2,24 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from PoseVal import pose_val
-from multiprocessing import Semaphore, Manager, shared_memory, Lock, Process
+from multiprocessing import Semaphore, shared_memory
 import time
 # from threading import Thread, Lock
 
 class PoseEstimation:
-    def __init__(self, min_detection_confidence: float, min_tracking_confidence: float, shared_memory: np.ndarray, semaphore: Semaphore):
-
-
+    def __init__(self, min_detection_confidence: float, min_tracking_confidence: float, shared_frame: np.ndarray, semaphore: Semaphore, shared_frame_pop_idx_name: str, shared_frame_push_idx_name: str, shared_frame_idx_rotation_name: str):
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(min_detection_confidence=min_detection_confidence, min_tracking_confidence=min_tracking_confidence)
         self.min_detection_confidence = min_detection_confidence
         self.min_tracking_confidence = min_tracking_confidence
         self.mp_drawing = mp.solutions.drawing_utils
         self.semaphore = semaphore
-        self.shared_memory = shared_memory
+        self.shared_memory = shared_frame
         # self.shared_memory = shared_memory.SharedMemory(name=shared_memory_name)
+        self.shared_frame_pop_idx = shared_memory.SharedMemory(name=shared_frame_pop_idx_name).buf.cast('i')
+        self.shared_frame_push_idx = shared_memory.SharedMemory(name=shared_frame_push_idx_name).buf.cast('i')
+        self.shared_frame_idx_rotation = shared_memory.SharedMemory(name=shared_frame_idx_rotation_name).buf.cast('i')
+
 
     def run(self):
         # print("ttset")
@@ -39,8 +41,14 @@ class PoseEstimation:
             # Make detection
             # self.semaphore.acquire()
 
-            with self.semaphore:
-                image = np.copy(self.shared_memory)
+            # with self.semaphore:
+            while not self.shared_frame_idx_rotation[0] and self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]:
+                pass
+
+            image = np.copy(self.shared_memory[self.shared_frame_pop_idx[0]])
+            if self.shared_frame_pop_idx[0] + 1 >= 30:
+                self.shared_frame_idx_rotation[0] -= 1
+            self.shared_frame_pop_idx[0] = (self.shared_frame_pop_idx[0] + 1) % 30
             # self.semaphore.release()
 
 

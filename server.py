@@ -1,6 +1,7 @@
 from DBConnection import *
 from PoseEstimation import *
 from DroneController import *
+from ESPConnection import *
 # from threading import Thread, Lock
 from multiprocessing import Process, shared_memory, Semaphore
 import numpy as np
@@ -47,6 +48,7 @@ if __name__ == "__main__":
     #
     shared_frame_push_idx = shared_memory.SharedMemory(create=True, name="shared_frame_push_idx")
     shared_frame_pop_idx = shared_memory.SharedMemory(create=True, name="shared_frame_pop_idx")
+    shared_frame_idx_rotation = shared_memory.SharedMemory(create=True, name="shared_frame_idx_rotation")
     shared_frame = np.ndarray(shape=(480, 640, 3, 30), dtype=np.uint8, buffer=img_shared_frame.buf)
 
     frame_push_idx = shared_frame_push_idx.buf.cast('i')
@@ -54,6 +56,9 @@ if __name__ == "__main__":
 
     frame_pop_idx = shared_frame_pop_idx.buf.cast('i')
     frame_pop_idx[0] = 0
+
+    frame_idx_rotation = shared_frame_idx_rotation.buf.cast('i')
+    frame_idx_rotation[0] = 0
 
     # cam 객체 생성
 
@@ -64,17 +69,18 @@ if __name__ == "__main__":
     procs = []
 
     # PoseEstimation 객체 생성
-    pe = PoseEstimation(min_detection_confidence=0.5, min_tracking_confidence=0.5, shared_memory=shared_frame, semaphore=img_semaphore)
+    pe = PoseEstimation(min_detection_confidence=0.5, min_tracking_confidence=0.5, shared_frame=shared_frame, semaphore=img_semaphore)
 
+    ec = ESPConnection(shared_frame=shared_frame, shared_frame_push_idx_name='shared_frame_push_idx', shared_frame_pop_idx_name='shared_frame_pop_idx', shared_frame_idx_rotation_name='shared_frame_idx_rotation', img_size=(480, 640), serverPort=4703)
     # p = Process(target=img_save, args=(shared_frame, img_lock, cam))
     
     # p = Thread(target=img_save, args=(shared_frame, img_lock, cam, ))
 
     
 
-    p = Process(target=img_save, args=(shared_frame, img_semaphore))
-    p.start()
-    procs.append(p)
+    # p = Process(target=img_save, args=(shared_frame, img_semaphore))
+    # p.start()
+    # procs.append(p)
     # print("프로세스 시작됨")
     
 
@@ -84,10 +90,17 @@ if __name__ == "__main__":
     # db_process = Process(target=db.run, args=())
     # pe_process = Thread(target=pe.run)
     # try:
+
     pe_process = Process(target=pe.run)
     procs.append(pe_process)
-    #     # db_process.start()
     pe_process.start()
+
+    ec_process = Process(target=ec.run)
+    procs.append(ec_process)
+    ec_process.start()
+
+    #     # db_process.start()
+
     #     # db_process.join()
     # p.join()
     # pe_process.join()
