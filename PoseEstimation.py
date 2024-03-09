@@ -7,55 +7,31 @@ import time
 # from threading import Thread, Lock
 
 class PoseEstimation:
-    def __init__(self, min_detection_confidence: float, min_tracking_confidence: float, shared_frame: np.ndarray, semaphore: Semaphore, shared_frame_pop_idx_name: str, shared_frame_push_idx_name: str, shared_frame_idx_rotation_name: str):
+    def __init__(self, min_detection_confidence: float, min_tracking_confidence: float, shared_frame: np.ndarray, shared_frame_pop_idx: np.ndarray, shared_frame_push_idx: np.ndarray, shared_frame_rotation_idx: np.ndarray, shared_position: np.ndarray, shared_box: np.ndarray):
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(min_detection_confidence=min_detection_confidence, min_tracking_confidence=min_tracking_confidence)
         self.min_detection_confidence = min_detection_confidence
         self.min_tracking_confidence = min_tracking_confidence
         self.mp_drawing = mp.solutions.drawing_utils
-        self.semaphore = semaphore
         self.shared_memory = shared_frame
-        # self.shared_memory = shared_memory.SharedMemory(name=shared_memory_name)
-        self.shared_frame_pop_idx = shared_memory.SharedMemory(name=shared_frame_pop_idx_name).buf.cast('i')
-        self.shared_frame_push_idx = shared_memory.SharedMemory(name=shared_frame_push_idx_name).buf.cast('i')
-        self.shared_frame_idx_rotation = shared_memory.SharedMemory(name=shared_frame_idx_rotation_name).buf.cast('i')
+        self.shared_frame_pop_idx = shared_frame_pop_idx
+        self.shared_frame_push_idx = shared_frame_push_idx
+        self.shared_frame_rotation_idx = shared_frame_rotation_idx
+        self.shared_position = shared_position
+        self.shared_box = shared_box
 
 
     def run(self):
-        # print("ttset")
-        # print(self.cap.isOpened())
-        # while self.cap.isOpened():
         while True:
             start_time = time.time()
-            # print(time.ctime())
-            # print("test")
-            # ret, frame = self.cap.read()
-
-            # print(type(frame))
-
-            # Recolor image to RGB
-            # image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            # image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
-            # image.flags.writeable = False
-
-            # Make detection
-            # self.semaphore.acquire()
-
-            # with self.semaphore:
-            while not self.shared_frame_idx_rotation[0] and self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]:
+            while not self.shared_frame_rotation_idx[0] and self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]:
                 pass
 
             image = np.copy(self.shared_memory[self.shared_frame_pop_idx[0]])
             if self.shared_frame_pop_idx[0] + 1 >= 30:
-                self.shared_frame_idx_rotation[0] -= 1
+                self.shared_frame_rotation_idx[0] -= 1
             self.shared_frame_pop_idx[0] = (self.shared_frame_pop_idx[0] + 1) % 30
-            # self.semaphore.release()
 
-
-            # print(image)
-
-            # with self.pose as pose:
-            # with self.mp_pose.Pose(min_detection_confidence=self.min_detection_confidence, min_tracking_confidence=self.min_tracking_confidence) as pose:
             try:
 
                 results = self.pose.process(image)
@@ -63,10 +39,6 @@ class PoseEstimation:
 
             except Exception as e:
                 print(e)
-
-            # Recolor back to BGR
-            # image.flags.writeable = True
-            # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
             # Extract landmarks
 
@@ -79,30 +51,9 @@ class PoseEstimation:
 
                 print(coordinates)
 
-                # calculate angle
-                # angle = self.calculate_angle(coordinates["LEFT_SHOULDER"], coordinates["LEFT_ELBOW"], coordinates["LEFT_WRIST"])
-                # for x, y in coordinates.items():
-                #     print(x, y)
-
-                # Visualize angle
-                # cv2.putText(image, str(angle),
-                #             tuple(np.multiply(coordinates["LEFT_ELBOW"], [640, 480]).astype(int)),
-                #             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
-
             except Exception as e:
                 print(e)
 
-                # Render detections
-            # self.mp_drawing.draw_landmarks(image, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS,
-            #                           self.mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
-            #                           self.mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2))
-            #
-            # cv2.imshow('Mediapipe Feed', image)
-
-            # if cv2.waitKey(10) & 0xFF == ord('q'):
-            #     self.cap.release()
-            #     cv2.destroyAllWindows()
-            #     break
             end_time = time.time()
             print(end_time - start_time)
 
