@@ -14,19 +14,30 @@ class DroneController:
         self.img_size = img_size
         self.subject_height = subject_height
         self.sensor_size = sensor_size
-        self.k_yaw = k_yaw
-        self.t0 = 0
-        self.d0 = 0
+        self.drone_v = 100
+
+    def calc_dist(self):
+        return (self.shared_box[1] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1])
 
     def calc_move(self):
-        size_x = (((self.img_size[0] // 2) - self.shared_box[0]) * ((self.shared_box[3] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1]))) / self.img_size[0]
-        size_y = (self.subject_height * (self.standard_box - self.shared_box[3])) / (self.sensor_size[0] * self.sensor_size[1])
-        size_z = (((self.img_size[1] // 2) - self.shared_box[1]) * ((self.shared_box[3] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1]))) / self.img_size[1]
+        d = self.calc_dist()
+        size_x = (((self.img_size[0] // 2) - self.shared_box[0]) * d) / self.img_size[0]
+        size_y = (self.subject_height * (self.standard_box - self.shared_box[0])) / (self.sensor_size[0] * self.sensor_size[1])
+        size_z = (((self.img_size[1] // 2) - self.shared_box[1]) * d) / self.img_size[1]
+        vx = self.drone.get_speed_x()
+        vy = self.drone.get_speed_y()
+        vz = self.drone.get_speed_z()
 
-        rc_pitch = (math.sqrt((size_x**2) + (size_y**2)) * ((self.shared_box[3] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1])) * math.sin(math.atan(size_y/size_x))) / (self.drone.t)
+
+
+        # size_x = (((self.img_size[0] // 2) - self.shared_box[0]) * ((self.shared_box[3] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1]))) / self.img_size[0]
+        # size_y = (self.subject_height * (self.standard_box - self.shared_box[3])) / (self.sensor_size[0] * self.sensor_size[1])
+        # size_z = (((self.img_size[1] // 2) - self.shared_box[1]) * ((self.shared_box[3] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1]))) / self.img_size[1]
+        # 
+        # rc_pitch = (math.sqrt((size_x**2) + (size_y**2)) * ((self.shared_box[3] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1])) * math.sin(math.atan(size_y/size_x))) / (self.drone.t)
 
     def run(self):
         while True:
             # if self.shared_box[0] < 0.5 - self.critical_value:
-            #     self.drone.send_command
+            #  0m에 4   self.drone.send_command
             pass
