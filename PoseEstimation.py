@@ -1,4 +1,6 @@
-import cv2
+import pickle
+
+# import cv2
 import mediapipe as mp
 import numpy as np
 from deep_sort_realtime.deepsort_tracker import DeepSort
@@ -62,6 +64,25 @@ def hand_signal(landmarks, hand_val):
     return is_open
 
 
+def hand_signal_seri(landmarks, hand_val):
+    open_hand_count = 0
+
+    w = landmarks[hand_val['WRIST']]
+    thumb = landmarks[hand_val['THUMB_TIP']]
+
+    stand_dis = calculate_distance([w.x, w.y], [thumb.x, thumb.y])
+
+    for key in ['INDEX_FINGER_TIP', 'PINKY_TIP', 'MIDDLE_FINGER_TIP', 'RING_FINGER_TIP']:
+        f = landmarks[hand_val[key]]
+        distance = calculate_distance([w.x, w.y], [f.x, f.y])
+
+        if distance > stand_dis:  # 임계값, 상황에 따라 조정 필요
+            open_hand_count += 1
+
+    is_open = open_hand_count >= 3
+    return is_open
+
+
 CONFIDENCE_THRESHOLD = 0.6
 GREEN = (0, 255, 0)
 YELLOW = (0, 255, 255)
@@ -78,8 +99,8 @@ class PoseEstimation:
     def __init__(self, shared_frame: np.ndarray, shared_frame_pop_idx: np.ndarray, shared_frame_push_idx: np.ndarray, shared_frame_rotation_idx: np.ndarray, shared_position: np.ndarray, shared_box: np.ndarray):
         self.mp_pose = mp.solutions.pose
         self.mp_hand = mp.solutions.hands
-        self.pose = self.mp_pose.Pose()
-        self.hand = self.mp_hand.Hands()
+        # self.pose = self.mp_pose.Pose()
+        # self.hand = self.mp_hand.Hands()
 
         self.mp_drawing = mp.solutions.drawing_utils
 
@@ -93,7 +114,6 @@ class PoseEstimation:
         self.shared_position = shared_position
         self.shared_box = shared_box
 
-
     def run(self):
         while True:
             # check shared memorry is available to get
@@ -102,6 +122,7 @@ class PoseEstimation:
                 pass
             # 공유 메모리에서 이미지 꺼내기
             frame = np.copy(self.shared_memory[self.shared_frame_pop_idx[0]])
+
             if self.shared_frame_pop_idx[0] + 1 >= 30:
                 self.shared_frame_rotation_idx[0] -= 1
             self.shared_frame_pop_idx[0] = (self.shared_frame_pop_idx[0] + 1) % 30
@@ -133,45 +154,46 @@ class PoseEstimation:
                 if human_box.size == 0:
                     continue
 
-                hand = self.hand.process(cv2.cvtColor(human_box, cv2.COLOR_RGB2BGR))
-                if hand.multi_hand_landmarks:
-                    for hand_landmarks in hand.multi_hand_landmarks:  # 반복문을 활용해 인식된 손의 주요 부분을 그림으로 그려 표현
-                        self.mp_drawing.draw_landmarks(
-                            human_box,
-                            hand_landmarks,
-                            self.mp_hand.HAND_CONNECTIONS,
-                        )
-                        check = hand_signal(hand_landmarks, hand_val)
+                # hand = self.mp_hand.Hands().process(cv2.cvtColor(human_box, cv2.COLOR_RGB2BGR))
+                hand = self.mp_hand.Hands().process(human_box)
+
+                if hand:
+                    for hand_landmarks in hand:  # 반복문을 활용해 인식된 손의 주요 부분을 그림으로 그려 표현
+                        # self.mp_drawing.draw_landmarks(
+                        #     human_box,
+                        #     hand_landmarks,
+                        #     self.mp_hand.HAND_CONNECTIONS,
+                        # )
+                        # check = hand_signal(hand_landmarks, hand_val)
+                        check = hand_signal_seri(hand_landmarks, hand_val)
+
                         print(f'check : {check}')
                         if check:
                             self.track_id = track_id
-                            self.run(frame, track)
+                            self.process(frame, track)
                             return
 
                 xmin, ymin, xmax, ymax = map(int, [box[0], box[1], box[2], box[3]])
                 print("box : ", xmin, ymin, xmax, ymax)
 
-                cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), GREEN, BOLD)
-                cv2.rectangle(frame, (xmin, ymin - 20), (xmin + 20, ymin), YELLOW, -1)
-                cv2.putText(frame, track_id, (xmin + 5, ymin - 8),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, BLACK, 2)
-
-            cv2.imshow('hand detect', frame)
+            #     cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), GREEN, BOLD)
+            #     cv2.rectangle(frame, (xmin, ymin - 20), (xmin + 20, ymin), YELLOW, -1)
+            #     cv2.putText(frame, track_id, (xmin + 5, ymin - 8),
+            #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, BLACK, 2)
+            #
+            # cv2.imshow('hand detect', frame)
 
     def process(self, frame, track):
-        print("testestetstste")
         while True:
             box = track.to_ltrb()  # (min x, min y, max x, max y)
             human_box = frame[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
             xmin, ymin, xmax, ymax = map(int, [human_box[0], human_box[1], human_box[2], human_box[3]])
             # self.shared_box = np.array([xmin + xmax/2, ymin + ymin/2, xmax, ymax])
             np.copyto(self.shared_box, np.array([xmin + xmax/2, ymin + ymin/2, xmax, ymax]))
-            # self.shared_box[0] = xmin + xmax/2
-            # self.shared_box[1] = ymin + ymin/2
-            # self.shared_box[2] = xmax
-            # self.shared_box[3] = ymax
 
-            body = self.pose.process(cv2.cvtColor(human_box, cv2.COLOR_RGB2BGR))
+            # body = self.mp_pose.Pose().process(cv2.cvtColor(human_box, cv2.COLOR_RGB2BGR))
+            body = self.mp_pose.Pose().process(human_box)
+
             if body.pose_landmarks:
                 body_landmarks = body.pose_landmarks.landmark
                 array_buf = np.empty((34, 4))
@@ -180,7 +202,6 @@ class PoseEstimation:
                         value = float(tup.split(': ')[1])
                         array_buf[i, j] = value
                 self.shared_position = array_buf.copy()
-
 
                 self.mp_drawing.draw_landmarks(
                     human_box,
@@ -192,7 +213,7 @@ class PoseEstimation:
                 for name, val in pose_val.items():
                     coordinates[name] = [round(body_landmarks[pose_val[name]].x, 3),
                                          round(body_landmarks[pose_val[name]].y, 3)]
-            cv2.imshow('Pose Estimation', frame)
+            # cv2.imshow('Pose Estimation', frame)
 
             # check shared memorry is available to get
             while (not self.shared_frame_rotation_idx[0]
@@ -203,4 +224,5 @@ class PoseEstimation:
             if self.shared_frame_pop_idx[0] + 1 >= 30:
                 self.shared_frame_rotation_idx[0] -= 1
             self.shared_frame_pop_idx[0] = (self.shared_frame_pop_idx[0] + 1) % 30
+
 
