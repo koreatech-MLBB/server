@@ -75,7 +75,8 @@ model = YOLO('./yolov8_pretrained/yolov8n.pt')
 
 
 class PoseEstimation:
-    def __init__(self, shared_frame: np.ndarray, shared_frame_pop_idx: np.ndarray, shared_frame_push_idx: np.ndarray, shared_frame_rotation_idx: np.ndarray, shared_position: np.ndarray, shared_box: np.ndarray):
+    def __init__(self, shared_frame: np.ndarray, shared_frame_pop_idx: np.ndarray, shared_frame_push_idx: np.ndarray,
+                 shared_frame_rotation_idx: np.ndarray, shared_position: np.ndarray, shared_box: np.ndarray):
         self.mp_pose = mp.solutions.pose
         self.mp_hand = mp.solutions.hands
         self.pose = self.mp_pose.Pose()
@@ -162,10 +163,15 @@ class PoseEstimation:
         while True:
             box = track.to_ltrb()  # (min x, min y, max x, max y)
             human_box = frame[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
+            xmin, ymin, xmax, ymax = map(int, [human_box[0], human_box[1], human_box[2], human_box[3]])
+
+            # NOTE: shared_box
+            self.shared_box = [xmin + xmax / 2, ymin + ymax / 2, xmax, ymax]
 
             body = self.pose.process(cv2.cvtColor(human_box, cv2.COLOR_RGB2BGR))
             if body.pose_landmarks:
                 body_landmarks = body.pose_landmarks.landmark
+                self.shared_position = body_landmarks
 
                 self.mp_drawing.draw_landmarks(
                     human_box,
@@ -193,4 +199,3 @@ class PoseEstimation:
                 self.cap.release()
                 cv2.destroyAllWindows()
                 exit()
-
