@@ -83,10 +83,6 @@ class PoseEstimation:
 
         self.mp_drawing = mp.solutions.drawing_utils
 
-        self.cap = cv2.VideoCapture(0)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-
         self.tracker = DeepSort()
         self.track_id = '0'
 
@@ -97,9 +93,18 @@ class PoseEstimation:
         self.shared_position = shared_position
         self.shared_box = shared_box
 
-    def pick_runner(self):
-        while self.cap.isOpened():
-            ret, frame = self.cap.read()
+
+    def run(self):
+        while True:
+            # check shared memorry is available to get
+            while (not self.shared_frame_rotation_idx[0]
+                   and self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]):
+                pass
+            # 공유 메모리에서 이미지 꺼내기
+            frame = np.copy(self.shared_memory[self.shared_frame_pop_idx[0]])
+            if self.shared_frame_pop_idx[0] + 1 >= 30:
+                self.shared_frame_rotation_idx[0] -= 1
+            self.shared_frame_pop_idx[0] = (self.shared_frame_pop_idx[0] + 1) % 30
 
             detection = model.predict(source=[frame])[0]
             results = []
@@ -153,22 +158,29 @@ class PoseEstimation:
 
             cv2.imshow('hand detect', frame)
 
-            if cv2.waitKey(10) & 0xFF == ord('q'):
-                self.cap.release()
-                cv2.destroyAllWindows()
-                break
-
-    def run(self, frame, track):
+    def process(self, frame, track):
+        print("testestetstste")
         while True:
             box = track.to_ltrb()  # (min x, min y, max x, max y)
             human_box = frame[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
             xmin, ymin, xmax, ymax = map(int, [human_box[0], human_box[1], human_box[2], human_box[3]])
-            self.shared_box = [xmin + xmax/2, ymin + ymin/2, xmax, ymax]
+            # self.shared_box = np.array([xmin + xmax/2, ymin + ymin/2, xmax, ymax])
+            np.copyto(self.shared_box, np.array([xmin + xmax/2, ymin + ymin/2, xmax, ymax]))
+            # self.shared_box[0] = xmin + xmax/2
+            # self.shared_box[1] = ymin + ymin/2
+            # self.shared_box[2] = xmax
+            # self.shared_box[3] = ymax
 
             body = self.pose.process(cv2.cvtColor(human_box, cv2.COLOR_RGB2BGR))
             if body.pose_landmarks:
                 body_landmarks = body.pose_landmarks.landmark
-                self.shared_position = body_landmarks
+                array_buf = np.empty((34, 4))
+                for i, landmark in enumerate(body_landmarks):
+                    for j, tup in enumerate(str(landmark).strip().split('\n')):
+                        value = float(tup.split(': ')[1])
+                        array_buf[i, j] = value
+                self.shared_position = array_buf.copy()
+
 
                 self.mp_drawing.draw_landmarks(
                     human_box,
@@ -191,9 +203,4 @@ class PoseEstimation:
             if self.shared_frame_pop_idx[0] + 1 >= 30:
                 self.shared_frame_rotation_idx[0] -= 1
             self.shared_frame_pop_idx[0] = (self.shared_frame_pop_idx[0] + 1) % 30
-
-            if cv2.waitKey(10) & 0xFF == ord('q'):
-                self.cap.release()
-                cv2.destroyAllWindows()
-                exit()
 

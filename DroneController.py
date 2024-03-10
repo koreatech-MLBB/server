@@ -3,7 +3,7 @@ from djitellopy import Tello
 import numpy as np
 import math
 class DroneController:
-    def __init__(self, ssid: str, password: str, shared_position: np.ndarray, shared_box: np.ndarray, standard_box: int, critical_value: float, img_size: tuple, sensor_size: tuple, subject_height: float, k_yaw: float):
+    def __init__(self, ssid: str, password: str, shared_position: np.ndarray, shared_box: np.ndarray, standard_box: int, critical_value: float, img_size: tuple, sensor_size: tuple, subject_height: float):
         # self.drone = Tello(ssid=ssid, password=password)
         self.drone = Tello()
         self.drone.connect()
@@ -24,11 +24,11 @@ class DroneController:
         size_x = (((self.img_size[0] // 2) - self.shared_box[0]) * d) / self.img_size[0]
         size_y = (self.subject_height * (self.standard_box - self.shared_box[0])) / (self.sensor_size[0] * self.sensor_size[1])
         size_z = (((self.img_size[1] // 2) - self.shared_box[1]) * d) / self.img_size[1]
-        vx = self.drone.get_speed_x()
-        vy = self.drone.get_speed_y()
-        vz = self.drone.get_speed_z()
+        # vx = self.drone.get_speed_x()
+        # vy = self.drone.get_speed_y()
+        # vz = self.drone.get_speed_z()
 
-
+        return size_x, size_y, size_z
 
         # size_x = (((self.img_size[0] // 2) - self.shared_box[0]) * ((self.shared_box[3] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1]))) / self.img_size[0]
         # size_y = (self.subject_height * (self.standard_box - self.shared_box[3])) / (self.sensor_size[0] * self.sensor_size[1])
@@ -37,7 +37,12 @@ class DroneController:
         # rc_pitch = (math.sqrt((size_x**2) + (size_y**2)) * ((self.shared_box[3] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1])) * math.sin(math.atan(size_y/size_x))) / (self.drone.t)
 
     def run(self):
-        while True:
-            # if self.shared_box[0] < 0.5 - self.critical_value:
-            #  0m에 4   self.drone.send_command
-            pass
+        self.drone.takeoff()
+        try:
+            while True:
+                x, y, z = self.calc_dist()
+                self.drone.go_xyz_speed(x, y, z, self.drone_v)
+        except KeyboardInterrupt as k:
+            print(k)
+        finally:
+            self.drone.land()
