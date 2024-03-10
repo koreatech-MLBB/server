@@ -162,10 +162,13 @@ class PoseEstimation:
         while True:
             box = track.to_ltrb()  # (min x, min y, max x, max y)
             human_box = frame[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
+            xmin, ymin, xmax, ymax = map(int, [human_box[0], human_box[1], human_box[2], human_box[3]])
+            self.shared_box = [xmin + xmax/2, ymin + ymin/2, xmax, ymax]
 
             body = self.pose.process(cv2.cvtColor(human_box, cv2.COLOR_RGB2BGR))
             if body.pose_landmarks:
                 body_landmarks = body.pose_landmarks.landmark
+                self.shared_position = body_landmarks
 
                 self.mp_drawing.draw_landmarks(
                     human_box,
