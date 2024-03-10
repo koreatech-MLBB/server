@@ -94,8 +94,8 @@ class PoseEstimation:
         self.shared_frame_pop_idx = shared_frame_pop_idx
         self.shared_frame_push_idx = shared_frame_push_idx
         self.shared_frame_rotation_idx = shared_frame_rotation_idx
-        self.shared_position = shared_position
-        self.shared_box = shared_box
+        self.shared_position = shared_position  # mediapipe 값
+        self.shared_box = shared_box  # Yolo 값 : list (중심(x,y), 가로, 세로)
 
     def pick_runner(self):
         while self.cap.isOpened():
