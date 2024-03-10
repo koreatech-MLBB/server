@@ -108,3 +108,6 @@ wheel                  0.41.2
 xdg                    5
 xkit                   0.0.0
 zipp                   3.17.0
+---------------------- ----------------
+deep_sort_realtime
+ultralytics
