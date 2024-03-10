@@ -33,3 +33,12 @@ pose_val = {
   'LEFT_FOOT_INDEX': 31,
   'RIGHT_FOOT_INDEX': 32
 }
+
+hand_val = {
+  'WRIST': 0,
+  'THUMB_TIP': 4,
+  'INDEX_FINGER_TIP': 8,
+  'MIDDLE_FINGER_TIP': 12,
+  'RING_FINGER_TIP': 16,
+  'PINKY_TIP': 20
+}
