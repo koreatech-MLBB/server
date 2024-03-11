@@ -1,4 +1,6 @@
 # import cv2
+import pickle
+
 import mediapipe as mp
 import numpy as np
 from deep_sort_realtime.deepsort_tracker import DeepSort
@@ -48,6 +50,43 @@ def hand_signal_seri(landmarks, hand_val):
 
     is_open = open_hand_count >= 3
     return is_open
+
+
+def serialize_hand_landmarks(multi_hand_landmarks):
+    serialized_data = []
+    if multi_hand_landmarks:
+        for hand_landmarks in multi_hand_landmarks:
+            hand_data = []
+            for landmark in hand_landmarks.landmark:
+                # 각 랜드마크의 x, y, z 좌표와 visibility를 딕셔너리 형태로 저장
+                hand_data.append({
+                    'x': landmark.x,
+                    'y': landmark.y,
+                    'z': landmark.z,
+                    'visibility': landmark.visibility
+                })
+            serialized_data.append(hand_data)
+    else:
+        return multi_hand_landmarks
+    return serialized_data
+
+
+def serialize_pose_landmarks(pose_landmarks):
+    serialized_data = []
+    if pose_landmarks:
+        pose_data = []
+        for landmark in pose_landmarks.landmark:
+            # 각 랜드마크의 x, y, z 좌표와 visibility를 딕셔너리 형태로 저장
+            pose_data.append({
+                'x': landmark.x,
+                'y': landmark.y,
+                'z': landmark.z,
+                'visibility': landmark.visibility
+            })
+        serialized_data.append(pose_data)
+    else:
+        return pose_landmarks
+    return serialized_data
 
 
 CONFIDENCE_THRESHOLD = 0.6
@@ -116,6 +155,9 @@ class PoseEstimation:
                     continue
 
                 hand = mp.solutions.hands.Hands().process(human_box)
+                serialized_hand_landmarks = serialize_hand_landmarks(results.multi_hand_landmarks)
+                serialized_bytes = pickle.dumps(serialized_hand_landmarks)
+                hand = pickle.loads(serialized_bytes)
 
                 if hand:
                     for hand_landmarks in hand:
@@ -134,6 +176,9 @@ class PoseEstimation:
             np.copyto(self.shared_box, np.array([xmin + xmax/2, ymin + ymin/2, xmax, ymax]))
 
             body = mp.solutions.pose.Pose().process(human_box)
+            serialized_pose = serialize_pose_landmarks(body.pose_landmarks)
+            serialized_bytes = pickle.dumps(serialized_pose)
+            body = pickle.loads(serialized_bytes)
 
             if body:
                 self.shared_position = body
