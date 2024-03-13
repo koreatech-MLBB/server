@@ -9,16 +9,16 @@ import matplotlib.pyplot as plt
 
 import time
 class ESPConnection:
-    # def __init__(self, shared_frame: np.ndarray, shared_frame_push_idx: np.ndarray, shared_frame_pop_idx: np.ndarray, shared_frame_rotation_idx: np.ndarray, img_size: tuple = (480, 640), serverPort: int = 4703):
-    def __init__(self, img_size: tuple = (480, 640), serverPort: int = 27032, ip: str = ''):
-        # self.serverPort = serverPort
+    def __init__(self, shared_frame: np.ndarray, shared_frame_push_idx: np.ndarray, shared_frame_pop_idx: np.ndarray, shared_frame_rotation_idx: np.ndarray, img_size: tuple = (480, 640), serverPort: int = 4703, ip: str = ''):
+    # def __init__(self, img_size: tuple = (480, 640), serverPort: int = 27032, ip: str = ''):
+    #     self.serverPort = serverPort
         self.serverSocket = socket(AF_INET, SOCK_DGRAM)
         # self.serverSocket.bind(('', self.serverPort))
         self.serverSocket.bind((ip, serverPort))
-        # self.shared_frame = shared_frame
-        # self.shared_frame_pop_idx = shared_frame_pop_idx
-        # self.shared_frame_push_idx = shared_frame_push_idx
-        # self.shared_frame_rotation_idx = shared_frame_rotation_idx
+        self.shared_frame = shared_frame
+        self.shared_frame_pop_idx = shared_frame_pop_idx
+        self.shared_frame_push_idx = shared_frame_push_idx
+        self.shared_frame_rotation_idx = shared_frame_rotation_idx
         self.buf_size = img_size[0] * img_size[1] * 3
     def run(self):
         while True:

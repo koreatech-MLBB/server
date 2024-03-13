@@ -3,16 +3,15 @@ from PoseEstimation import *
 from DroneController import *
 from ESPConnection import *
 # from threading import Thread, Lock
-from multiprocessing import Process, shared_memory as sm, Semaphore
-from multiprocessing import Semaphore
+from multiprocessing import Process, shared_memory as sm, Lock
+# from multiprocessing import Semaphore
 from multiprocessing import Pool
 import numpy as np
 import time
 
 
 def img_save(shared_frame_name, shared_frame_rotation_idx_name,
-             shared_frame_pop_idx_name, shared_frame_push_idx_name,
-             semaphore, img_shape):
+             shared_frame_pop_idx_name, shared_frame_push_idx_name, img_shape, lock):
     cam = cv2.VideoCapture(0)
     shared_frame_buf = sm.SharedMemory(name=shared_frame_name)
     shared_frame_pop_idx_buf = sm.SharedMemory(name=shared_frame_pop_idx_name)
@@ -29,6 +28,8 @@ def img_save(shared_frame_name, shared_frame_rotation_idx_name,
         ret, frame = cam.read()
         # cv2.imshow('image', frame)
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # cv2.imshow(winname="test", mat=image)
+        # print("kakao")
 
         # semaphore.acquire()
         # print(f'shared memory - img : ', shared_frame)
@@ -36,7 +37,8 @@ def img_save(shared_frame_name, shared_frame_rotation_idx_name,
         # print(f'push - img : ', shared_frame_push_idx[0], end=", ")
         # print(f'rotation - img : ', shared_frame_rotation_idx[0])
 
-        # push가 한 바퀴 돌아서, pop 인덱스랑 push 인덱스가 같으면 세마포어 반납
+        # with lock:
+            # push가 한 바퀴 돌아서, pop 인덱스랑 push 인덱스가 같으면 세마포어 반납
         if shared_frame_rotation_idx[0] == 1 and (shared_frame_pop_idx[0] == shared_frame_push_idx[0]):
             # semaphore.release()
             # print("==================")
@@ -50,21 +52,22 @@ def img_save(shared_frame_name, shared_frame_rotation_idx_name,
         if shared_frame_push_idx[0] + 1 >= 30:
             shared_frame_rotation_idx[0] = 1
         shared_frame_push_idx[0] = (shared_frame_push_idx[0] + 1) % 30
-        # print(
-        #     f"is_shared_values: push_idx_{shared_frame_push_idx[0]}, pop_idx_{shared_frame_pop_idx[0]}, rot_idx_{shared_frame_rotation_idx[0]}")
-        # push가 마지막 인덱스에 위치해 있고, 아직 한바퀴 돌지 않았으면, 회전 정보 표시
-        # if shared_frame_push_idx[0] >= 30 and shared_frame_rotation_idx[0] == 0:
-        #     shared_frame_rotation_idx[0] = 1
-        #     shared_frame_push_idx[0] = 0
+            # print(
+            #     f"is_shared_values: push_idx_{shared_frame_push_idx[0]}, pop_idx_{shared_frame_pop_idx[0]}, rot_idx_{shared_frame_rotation_idx[0]}")
+            # push가 마지막 인덱스에 위치해 있고, 아직 한바퀴 돌지 않았으면, 회전 정보 표시
+            # if shared_frame_push_idx[0] >= 30 and shared_frame_rotation_idx[0] == 0:
+            #     shared_frame_rotation_idx[0] = 1
+            #     shared_frame_push_idx[0] = 0
 
         # semaphore.release()
-        time.sleep(0.1)
+        # time.sleep(0.25)
+
     end = time.time()
-    print(f'time : {end-start}')
+    # print(f'time : {end-start}')
     cam.release()
     cv2.destroyAllWindows()
 
-def pe_run():
+def pe_run(lock):
     pe = PoseEstimation(shared_frame_name="img_shared",
                         shared_frame_pop_idx_name="shared_frame_pop_idx",
                         shared_frame_push_idx_name="shared_frame_push_idx",
@@ -72,7 +75,8 @@ def pe_run():
                         shared_position_name="shared_position",
                         shared_box_name="shared_box",
                         # semaphore=semaphore_pe,
-                        img_shape=(480, 640))
+                        img_shape=(480, 640),
+                        lock=lock)
     pe.run()
 
 
@@ -144,9 +148,9 @@ if __name__ == "__main__":
         # 공유 메모리 numpy.ndarray로 변환
         # shared_position = np.ndarray(shape=(33, 4), dtype=np.float64, buffer=shared_position_memory.buf)
         # shared_box = np.ndarray(shape=(4), dtype=np.float64, buffer=shared_box_memory.buf)
-
-        semaphore = Semaphore()
-        semaphore_pe = Semaphore()
+        #
+        # semaphore = Semaphore()
+        # semaphore_pe = Semaphore()
         print("make semaphore")
 
         # 프로세스 리스트 생성
@@ -181,25 +185,28 @@ if __name__ == "__main__":
         # DroneController 객체 생성
         # dc = DroneController(ssid=ssid, password=password, shared_position=shared_position, shared_box=shared_box, standard_box=300, critical_value=10, img_size=img_size, sensor_size=(3.6, 3.6), subject_height=1.8)
 
+        lock = Lock()
+
         # # 이미지 저장 프로세스
         img_process = Process(target=img_save,
                               args=("img_shared", "shared_frame_rotation_idx",
                                     "shared_frame_pop_idx",
                                     "shared_frame_push_idx",
-                                    semaphore, img_size),
+                                    img_size,
+                                    lock),
                               name="test_img_save")
         procs.append(img_process)
         img_process.start()
 
         # print("make semaphore - img")
 
-        time.sleep(4)
+        # time.sleep(4)
 
         # pe 프로세스 생성
         # pe_process = Process(target=pe.run, name="pose_estimation")
-        pe_process = Process(target=pe_run, name="pose_estimation")
+        pe_process = Process(target=pe_run, args=(lock, ), name="pose_estimation")
         procs.append(pe_process)
-        print("make semaphore - before start pe.run")
+        # print("make semaphore - before start pe.run")
         pe_process.start()
         # print("make semaphore - pe.run")
 
@@ -220,6 +227,8 @@ if __name__ == "__main__":
 
         for p in procs:
             p.join()
+        # while True:
+        #     pass
 
     except KeyboardInterrupt as e:
         print(e)

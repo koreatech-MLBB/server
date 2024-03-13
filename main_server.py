@@ -21,6 +21,7 @@ class server:
         self.shared_memories = []
 
     def init_shared_memory(self):
+        print("Initialize shared memories")
         try:
             img_shared_frame = shared_memory.SharedMemory(name="img_shared")
         except FileNotFoundError:
@@ -111,7 +112,9 @@ class server:
 
         dc.run()
 
-    def main(self):
+    def run(self):
+
+        self.init_shared_memory()
 
         processes = []
 
@@ -128,15 +131,17 @@ class server:
 
         for p in processes:
             p.start()
+
+        for p in processes:
             p.join()
 
-        while True:
-            if keyboard.is_pressed("q"):
-                for p in processes:
-                    p.close()
-                self.close_shared_memory()
+        # while True:
+        #     if keyboard.is_pressed("q"):
+        #         for p in processes:
+        #             p.terminate()
+                    # p.close()
+        self.close_shared_memory()
 
 if __name__=="__main__":
     main = server()
-    main.init_shared_memory()
-    main.main()
+    main.run()

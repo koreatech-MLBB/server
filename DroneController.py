@@ -40,7 +40,7 @@ class DroneController:
         self.drone.takeoff()
         try:
             while True:
-                x, y, z = self.calc_dist()
+                x, y, z = self.calc_move()
                 self.drone.go_xyz_speed(x, y, z, self.drone_v)
         except KeyboardInterrupt as k:
             print(k)

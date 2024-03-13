@@ -1,16 +1,18 @@
 # import cv2
 import pickle
 
+import logging
+
 import mediapipe as mp
 import numpy as np
 from deep_sort_realtime.deepsort_tracker import DeepSort
 from ultralytics import YOLO
 
-from multiprocessing import Semaphore
-from multiprocessing import shared_memory as sm
+from multiprocessing import shared_memory as sm, Lock
 
 from PoseVal import hand_val
 
+import time
 
 # from threading import Thread, Lock
 
@@ -105,68 +107,96 @@ model = YOLO('./yolov8_pretrained/yolov8n.pt')
 
 
 class PoseEstimation:
-    # def __init__(self, shared_frame: np.ndarray, shared_frame_pop_idx: np.ndarray, shared_frame_push_idx: np.ndarray, shared_frame_rotation_idx: np.ndarray, shared_position: np.ndarray, shared_box: np.ndarray, semaphore: Semaphore):
     def __init__(self, shared_frame_name: str, shared_frame_pop_idx_name: str,
                      shared_frame_push_idx_name: str, shared_frame_rotation_idx_name: str,
-                     shared_position_name: str, shared_box_name: str, img_shape: tuple):
+                     shared_position_name: str, shared_box_name: str, img_shape: tuple, lock: Lock):
         self.tracker = DeepSort()
         self.track_id = '0'
 
-        shared_frame_buf = sm.SharedMemory(name=shared_frame_name)
-        shared_frame_pop_idx_buf = sm.SharedMemory(name=shared_frame_pop_idx_name)
-        shared_frame_push_idx_buf = sm.SharedMemory(name=shared_frame_push_idx_name)
-        shared_frame_rotation_idx_buf = sm.SharedMemory(name=shared_frame_rotation_idx_name)
-        shared_position_buf = sm.SharedMemory(name=shared_position_name)
-        shared_box_buf = sm.SharedMemory(name=shared_box_name)
+        self.shared_frame_name = shared_frame_name
+        self.shared_frame_pop_idx_name = shared_frame_pop_idx_name
+        self.shared_frame_push_idx_name = shared_frame_push_idx_name
+        self.shared_frame_rotation_idx_name = shared_frame_rotation_idx_name
+        self.shared_position_name = shared_position_name
+        self.shared_box_name = shared_box_name
 
-        self.shared_frame = np.ndarray(shape=(30, img_shape[0], img_shape[1], 3), dtype=np.uint8, buffer=shared_frame_buf.buf)
-        self.shared_frame_pop_idx = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_pop_idx_buf.buf)
-        self.shared_frame_push_idx = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_push_idx_buf.buf)
-        self.shared_frame_rotation_idx = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_rotation_idx_buf.buf)
-        self.shared_position = np.ndarray(shape=(33, 4), dtype=np.float64, buffer=shared_position_buf.buf)
-        self.shared_box = np.ndarray(shape=(4, ), dtype=np.float64, buffer=shared_box_buf.buf)
+        # shared_frame_buf = sm.SharedMemory(name=shared_frame_name)
+        # shared_frame_pop_idx_buf = sm.SharedMemory(name=shared_frame_pop_idx_name)
+        # shared_frame_push_idx_buf = sm.SharedMemory(name=shared_frame_push_idx_name)
+        # shared_frame_rotation_idx_buf = sm.SharedMemory(name=shared_frame_rotation_idx_name)
+        # shared_position_buf = sm.SharedMemory(name=shared_position_name)
+        # shared_box_buf = sm.SharedMemory(name=shared_box_name)
+        #
+        # self.shared_frame = np.ndarray(shape=(30, img_shape[0], img_shape[1], 3), dtype=np.uint8, buffer=shared_frame_buf.buf)
+        # self.shared_frame_pop_idx = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_pop_idx_buf.buf)
+        # self.shared_frame_push_idx = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_push_idx_buf.buf)
+        # self.shared_frame_rotation_idx = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_rotation_idx_buf.buf)
+        # self.shared_position = np.ndarray(shape=(33, 4), dtype=np.float64, buffer=shared_position_buf.buf)
+        # self.shared_box = np.ndarray(shape=(4, ), dtype=np.float64, buffer=shared_box_buf.buf)
 
-        # self.semaphore = semaphore
+        self.lock = lock
 
     def run(self):
-        print("test")
         while True:
-            # check shared memorry is available to get
-            # while (not self.shared_frame_rotation_idx[0] and self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]):
-            #     # self.shared_frame_rotation_idx = self.shared_frame_rotation_idx
-            #     # self.shared_frame_push_idx = self.shared_frame_push_idx
-            #     # self.shared_frame_pop_idx = self.shared_frame_pop_idx
-            #     # print(f"pe_shared_values: push_idx_{self.shared_frame_push_idx[0]}, pop_idx_{self.shared_frame_pop_idx[0]}, rot_idx_{self.shared_frame_rotation_idx[0]}")
-            #     pass
-            # print("this is shared memory", flush=True)
-            # 공유 메모리에서 이미지 꺼내기
-            # self.semaphore.acquire()
-            # print("tttest")
-            print(f'pose: pop - pe : ', self.shared_frame_pop_idx[0], end=", ")
-            print(f'push - pe : ', self.shared_frame_push_idx, end=", ")
-            print(f'rotation - pe : ', self.shared_frame_rotation_idx)
+            shared_frame_buf = sm.SharedMemory(name=self.shared_frame_name)
+            shared_frame_pop_idx_buf = sm.SharedMemory(name=self.shared_frame_pop_idx_name)
+            shared_frame_push_idx_buf = sm.SharedMemory(name=self.shared_frame_push_idx_name)
+            shared_frame_rotation_idx_buf = sm.SharedMemory(name=self.shared_frame_rotation_idx_name)
+            shared_position_buf = sm.SharedMemory(name=self.shared_position_name)
+            shared_box_buf = sm.SharedMemory(name=self.shared_box_name)
+
+            shared_frame = np.ndarray(shape=(30, 480, 640, 3), dtype=np.uint8, buffer=shared_frame_buf.buf)
+            shared_frame_pop_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_pop_idx_buf.buf)
+            shared_frame_push_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_push_idx_buf.buf)
+            shared_frame_rotation_idx = np.ndarray(shape=(1,), dtype=np.uint8,
+                                                        buffer=shared_frame_rotation_idx_buf.buf)
+            shared_position = np.ndarray(shape=(33, 4), dtype=np.float64, buffer=shared_position_buf.buf)
+            shared_box = np.ndarray(shape=(4,), dtype=np.float64, buffer=shared_box_buf.buf)
             # try:
-            if self.shared_frame_rotation_idx[0] == 0 and (self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]):
-                # print("in if pe")
+            # print(f"test: {self.shared_frame_rotation_idx[0]}")
+            print("test")
+            # time.sleep(0.1)
+            # try:
+            #     print(f"shared_idx: {self.shared_frame_push_idx[0]}")
+            # except Exception as e:
+            #     raise e
+            # with self.lock:
+            #     if self.shared_frame_rotation_idx[0] == 0 and (
+            #             self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]):
+            #         # if (self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]):
+            #         print("you are in this if condition")
+            #         continue
+            #     else:
+            #         print("nononono")
+            #
+            #     frame = np.copy(self.shared_frame[self.shared_frame_pop_idx[0]])
+            #
+            #     if self.shared_frame_pop_idx[0] + 1 >= 30:
+            #         self.shared_frame_rotation_idx[0] = 0
+            #     self.shared_frame_pop_idx[0] = (self.shared_frame_pop_idx[0] + 1) % 30
+            # # except Exception as e:
+            # #     print(e)
+            # # print(
+            # #     f"pe_shared_values: push_idx_{self.shared_frame_push_idx[0]}, pop_idx_{self.shared_frame_pop_idx[0]}, rot_idx_{self.shared_frame_rotation_idx[0]}")
+            #
+            # with self.lock:
+            if shared_frame_rotation_idx[0] == 0 and (shared_frame_pop_idx[0] == shared_frame_push_idx[0]):
+            # if (self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]):
                 print("you are in this if condition")
-                # self.semaphore.relase()
                 continue
+            else:
+                print("nononono")
+
+            frame = np.copy(shared_frame[shared_frame_pop_idx[0]])
+
+            if shared_frame_pop_idx[0] + 1 >= 30:
+                shared_frame_rotation_idx[0] = 0
+            shared_frame_pop_idx[0] = (shared_frame_pop_idx[0] + 1) % 30
             # except Exception as e:
             #     print(e)
-            # print(f'shared memory - pe : ', self.shared_frame)
-
-
-            frame = np.copy(self.shared_frame[self.shared_frame_pop_idx[0]])
-
-            if self.shared_frame_pop_idx[0] + 1 >= 30:
-                self.shared_frame_rotation_idx[0] = 0
-            self.shared_frame_pop_idx[0] = (self.shared_frame_pop_idx[0] + 1) % 30
-
-            # self.semaphore.release()
-
-            # print(
-            #     f"pe_shared_values: push_idx_{self.shared_frame_push_idx[0]}, pop_idx_{self.shared_frame_pop_idx[0]}, rot_idx_{self.shared_frame_rotation_idx[0]}")
-
+                # print(
+                #     f"pe_shared_values: push_idx_{self.shared_frame_push_idx[0]}, pop_idx_{self.shared_frame_pop_idx[0]}, rot_idx_{self.shared_frame_rotation_idx[0]}")
+            # time.sleep(0.25)
             detection = model.predict(source=[frame])[0]
             results = []
 
@@ -196,7 +226,7 @@ class PoseEstimation:
                     continue
 
                 hand = mp.solutions.hands.Hands().process(human_box)
-                serialized_hand_landmarks = serialize_hand_landmarks(results.multi_hand_landmarks)
+                serialized_hand_landmarks = serialize_hand_landmarks(hand.multi_hand_landmarks)
                 serialized_bytes = pickle.dumps(serialized_hand_landmarks)
                 hand = pickle.loads(serialized_bytes)
 
@@ -204,35 +234,101 @@ class PoseEstimation:
                     for hand_landmarks in hand:
                         if hand_signal_seri(hand_landmarks, hand_val):
                             self.track_id = track_id
+                            self.process(frame, track)
                             return
 
                 xmin, ymin, xmax, ymax = map(int, [box[0], box[1], box[2], box[3]])
                 print("box : ", xmin, ymin, xmax, ymax)
 
-    def process(self, frame, track):
+    def process(self, previous_frame, track):
+        # let = True
+        frame = previous_frame
+
+        box = track.to_ltrb()
+
         print("test")
         while True:
-            box = track.to_ltrb()  # (min x, min y, max x, max y)
+
+            landmark_buf = []
+
+            shared_frame_buf = sm.SharedMemory(name=self.shared_frame_name)
+            shared_frame_pop_idx_buf = sm.SharedMemory(name=self.shared_frame_pop_idx_name)
+            shared_frame_push_idx_buf = sm.SharedMemory(name=self.shared_frame_push_idx_name)
+            shared_frame_rotation_idx_buf = sm.SharedMemory(name=self.shared_frame_rotation_idx_name)
+            shared_position_buf = sm.SharedMemory(name=self.shared_position_name)
+            shared_box_buf = sm.SharedMemory(name=self.shared_box_name)
+
+            shared_frame = np.ndarray(shape=(30, 480, 640, 3), dtype=np.uint8, buffer=shared_frame_buf.buf)
+            shared_frame_pop_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_pop_idx_buf.buf)
+            shared_frame_push_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_push_idx_buf.buf)
+            shared_frame_rotation_idx = np.ndarray(shape=(1,), dtype=np.uint8,
+                                                   buffer=shared_frame_rotation_idx_buf.buf)
+            shared_position = np.ndarray(shape=(33, 4), dtype=np.float64, buffer=shared_position_buf.buf)
+            shared_box = np.ndarray(shape=(4,), dtype=np.float64, buffer=shared_box_buf.buf)
+            # box = track.to_ltrb()  # (min x, min y, max x, max y)
+            detection = model.predict(source=[frame])[0]
+            xmin, ymin, xmax, ymax = map(int, [box[0], box[1], box[2], box[3]])
             human_box = frame[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
-            xmin, ymin, xmax, ymax = map(int, [human_box[0], human_box[1], human_box[2], human_box[3]])
-            np.copyto(self.shared_box, np.array([xmin + xmax/2, ymin + ymin/2, xmax, ymax]))
+            # xmin, ymin, xmax, ymax = map(int, [human_box[0], human_box[1], human_box[2], human_box[3]])
+            np.copyto(shared_box, np.array([xmin + xmax/2, ymin + ymin/2, xmax, ymax]))
 
-            body = mp.solutions.pose.Pose().process(human_box)
-            serialized_pose = serialize_pose_landmarks(body.pose_landmarks)
-            serialized_bytes = pickle.dumps(serialized_pose)
-            body = pickle.loads(serialized_bytes)
+            if human_box.size != 0:
+                body = mp.solutions.pose.Pose().process(human_box)
 
-            if body:
-                self.shared_position = body
+                for landmark in body.pose_landmarks.landmark:
+                    landmark_buf.append(landmark.x)
+                    landmark_buf.append(landmark.y)
+                    landmark_buf.append(landmark.z)
+                    landmark_buf.append(landmark.visibility)
+                landmark_buf = np.reshape(landmark_buf, (33, -1))
+                # print(f"landmark_{landmark_buf}, shared_pos_{shared_position}")
+                np.copyto(shared_position, landmark_buf)
+                # landmark_buf = landmark_buf.tolist()
+
+            # serialized_pose = serialize_pose_landmarks(body.pose_landmarks)
+            # serialized_bytes = pickle.dumps(serialized_pose)
+            # body = pickle.loads(serialized_bytes)
+
+            # if body:
+            #     self.shared_position = body
+
+            results = []
+
+            for data in detection.boxes.data.tolist():
+                confidence = float(data[4])
+                label = int(data[5])
+                if confidence < CONFIDENCE_THRESHOLD or label != 0:
+                    continue
+
+                xmin, ymin, xmax, ymax = map(int, [x for x in data[:4]])
+                results.append([[xmin, ymin, xmax - xmin, ymax - ymin], confidence, label])
+
+            tracks = self.tracker.update_tracks(results, frame=frame)
+            for t in tracks:
+                if t.track_id == self.track_id:
+                    track = t
+                    box = track.to_ltrb()
+                    continue
+
+            logging.info("miss the runner")
 
             # check shared memorry is available to get
-            while (not self.shared_frame_rotation_idx[0]
-                   and self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]):
+            # while (not self.shared_frame_rotation_idx[0]
+            #        and self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]):
+            #     pass
+            # # 공유 메모리에서 이미지 꺼내기
+            # frame = np.copy(self.shared_memory[self.shared_frame_pop_idx[0]])
+            # if self.shared_frame_pop_idx[0] + 1 >= 30:
+            #     self.shared_frame_rotation_idx[0] -= 1
+            # self.shared_frame_pop_idx[0] = (self.shared_frame_pop_idx[0] + 1) % 30
+            #
+            while (not shared_frame_rotation_idx[0]
+                   and shared_frame_pop_idx[0] == shared_frame_push_idx[0]):
                 pass
             # 공유 메모리에서 이미지 꺼내기
-            frame = np.copy(self.shared_memory[self.shared_frame_pop_idx[0]])
-            if self.shared_frame_pop_idx[0] + 1 >= 30:
-                self.shared_frame_rotation_idx[0] -= 1
-            self.shared_frame_pop_idx[0] = (self.shared_frame_pop_idx[0] + 1) % 30
+            frame = np.copy(shared_frame[shared_frame_pop_idx[0]])
+            if shared_frame_pop_idx[0] + 1 >= 30:
+                shared_frame_rotation_idx[0] -= 1
+            shared_frame_pop_idx[0] = (shared_frame_pop_idx[0] + 1) % 30
 
 
