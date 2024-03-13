@@ -27,13 +27,13 @@ class ESPConnection:
                 message = np.frombuffer(message, dtype=np.uint8)
                 image = cv2.imdecode(message, cv2.IMREAD_COLOR)
 
-                # while self.shared_frame_rotation_idx[0] and self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]:
-                #     pass
-                #
-                # np.copyto(self.shared_frame[self.shared_frame_push_idx[0]], image)
-                # if self.shared_frame_pop_idx[0] + 1 >= 30:
-                #     self.shared_frame_rotation_idx[0] += 1
-                # self.shared_frame_pop_idx[0] = (self.shared_frame_rotation_idx[0] + 1) % 30
+                while self.shared_frame_rotation_idx[0] and self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]:
+                    pass
+
+                np.copyto(self.shared_frame[self.shared_frame_push_idx[0]], image)
+                if self.shared_frame_pop_idx[0] + 1 >= 30:
+                    self.shared_frame_rotation_idx[0] += 1
+                self.shared_frame_pop_idx[0] = (self.shared_frame_rotation_idx[0] + 1) % 30
 
                 print(f"message: {message}")
                 print(f"image: {image}")
