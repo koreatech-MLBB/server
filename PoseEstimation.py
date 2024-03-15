@@ -18,9 +18,10 @@ BOLD = 2
 
 model = YOLO('./yolov8_pretrained/yolov8n.pt')
 
-def PoseEstimation(shared_frame_name: str, shared_frame_pop_idx_name: str,
-                   shared_frame_push_idx_name: str, shared_frame_rotation_idx_name: str,
-                   shared_position_name: str, shared_box_name: str):
+def PoseEstimation(shared_memories: dict):
+        # shared_frame_name: str, shared_frame_pop_idx_name: str,
+        #            shared_frame_push_idx_name: str, shared_frame_rotation_idx_name: str,
+        #            shared_position_name: str, shared_box_name: str):
 
     tracker = DeepSort()
     track_id = '0'
@@ -80,6 +81,10 @@ def PoseEstimation(shared_frame_name: str, shared_frame_pop_idx_name: str,
         is_open = open_hand_count >= 3
         return is_open
 
+    def make_shared_memory(memories: dict):
+        for name, val in memories.items():
+            yield np.ndarray(shape=val[0], dtype=val[1], buffer=sm.SharedMemory(name=name).buf)
+
     def process(self, previous_frame, track):
         # let = True
         frame = previous_frame
@@ -93,19 +98,7 @@ def PoseEstimation(shared_frame_name: str, shared_frame_pop_idx_name: str,
 
             landmark_buf = []
 
-            shared_frame_buf = sm.SharedMemory(name=shared_frame_name)
-            shared_frame_pop_idx_buf = sm.SharedMemory(name=shared_frame_pop_idx_name)
-            shared_frame_push_idx_buf = sm.SharedMemory(name=shared_frame_push_idx_name)
-            shared_frame_rotation_idx_buf = sm.SharedMemory(name=shared_frame_rotation_idx_name)
-            shared_position_buf = sm.SharedMemory(name=shared_position_name)
-            shared_box_buf = sm.SharedMemory(name=shared_box_name)
-
-            shared_frame = np.ndarray(shape=(30, 480, 640, 3), dtype=np.uint8, buffer=shared_frame_buf.buf)
-            shared_frame_pop_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_pop_idx_buf.buf)
-            shared_frame_push_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_push_idx_buf.buf)
-            shared_frame_rotation_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_rotation_idx_buf.buf)
-            shared_position = np.ndarray(shape=(33, 4), dtype=np.float64, buffer=shared_position_buf.buf)
-            shared_box = np.ndarray(shape=(4,), dtype=np.float64, buffer=shared_box_buf.buf)
+            shared_frame, shared_frame_pop_idx, shared_frame_push_idx, shared_frame_rotation_idx, shared_position, shared_box = make_shared_memory(memories=shared_memories)
 
             # box = track.to_ltrb()  # (min x, min y, max x, max y)
             detection = model.predict(source=[frame])[0]
@@ -153,15 +146,8 @@ def PoseEstimation(shared_frame_name: str, shared_frame_pop_idx_name: str,
             shared_frame_pop_idx[0] = (shared_frame_pop_idx[0] + 1) % 30
 
     while True:
-        shared_frame_buf = sm.SharedMemory(name=shared_frame_name)
-        shared_frame_pop_idx_buf = sm.SharedMemory(name=shared_frame_pop_idx_name)
-        shared_frame_push_idx_buf = sm.SharedMemory(name=shared_frame_push_idx_name)
-        shared_frame_rotation_idx_buf = sm.SharedMemory(name=shared_frame_rotation_idx_name)
 
-        shared_frame = np.ndarray(shape=(30, 480, 640, 3), dtype=np.uint8, buffer=shared_frame_buf.buf)
-        shared_frame_pop_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_pop_idx_buf.buf)
-        shared_frame_push_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_push_idx_buf.buf)
-        shared_frame_rotation_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_rotation_idx_buf.buf)
+        shared_frame, shared_frame_pop_idx, shared_frame_push_idx, shared_frame_rotation_idx, shared_position, shared_box = make_shared_memory(memories=shared_memories)
 
         if shared_frame_rotation_idx[0] == 0 and (shared_frame_pop_idx[0] == shared_frame_push_idx[0]):
             continue

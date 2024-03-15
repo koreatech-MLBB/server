@@ -4,7 +4,7 @@ from DroneController import *
 from ESPConnectionOldVersion import *
 from multiprocessing import Process, shared_memory
 import keyboard
-
+import numpy as np
 
 class server:
     def __init__(self):
@@ -79,12 +79,12 @@ class server:
             sm.close()
 
     def pose_estimation_run(self):
-        PoseEstimation(shared_frame_name="img_shared",
-                        shared_frame_pop_idx_name="shared_frame_pop_idx",
-                        shared_frame_push_idx_name="shared_frame_push_idx",
-                        shared_frame_rotation_idx_name="shared_frame_rotation_idx",
-                        shared_position_name="shared_position",
-                        shared_box_name="shared_box")
+        PoseEstimation(shared_memories={"img_shared": [(30, 480, 640, 3), np.uint8],
+                                        "shared_frame_pop_idx": [(1, ), np.uint8],
+                                        "shared_frame_push_idx": [(1, ), np.uint8],
+                                        "shared_frame_rotation_idx": [(1, ), np.uint8],
+                                        "shared_position": [(33, 4), np.float64],
+                                        "shared_box": [(4, ), np.float64]})
 
     def esp_connection_run(self):
         ESPConnection(shared_frame="img_shared",
