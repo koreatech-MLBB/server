@@ -79,24 +79,20 @@ class server:
             sm.close()
 
     def pose_estimation_run(self):
-        pe = PoseEstimation(shared_frame_name="img_shared",
-                            shared_frame_pop_idx_name="shared_frame_pop_idx",
-                            shared_frame_push_idx_name="shared_frame_push_idx",
-                            shared_frame_rotation_idx_name="shared_frame_rotation_idx",
-                            shared_position_name="shared_position",
-                            shared_box_name="shared_box",
-                            img_shape=(480, 640))
-        pe.run()
+        PoseEstimation(shared_frame_name="img_shared",
+                        shared_frame_pop_idx_name="shared_frame_pop_idx",
+                        shared_frame_push_idx_name="shared_frame_push_idx",
+                        shared_frame_rotation_idx_name="shared_frame_rotation_idx",
+                        shared_position_name="shared_position",
+                        shared_box_name="shared_box")
 
     def esp_connection_run(self):
-        ec = ESPConnection(shared_frame="img_shared",
-                           img_size=(480, 640),
-                           serverPort=4703,
-                           shared_frame_pop_idx="shared_frame_pop_idx",
-                           shared_frame_push_idx="shared_frame_push_idx",
-                           shared_frame_rotation_idx="shared_frame_pop_idx")
-
-        ec.run()
+        ESPConnection(shared_frame="img_shared",
+                       img_size=(480, 640),
+                       serverPort=4703,
+                       shared_frame_pop_idx="shared_frame_pop_idx",
+                       shared_frame_push_idx="shared_frame_push_idx",
+                       shared_frame_rotation_idx="shared_frame_pop_idx")
 
     def drone_controller_run(self):
         dc = DroneController(ssid=self.ssid,
