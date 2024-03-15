@@ -1,11 +1,10 @@
 from DBConnection import *
-from PoseEstimation import *
+from PoseEstimationOldVersion import *
 from DroneController import *
-from ESPConnection import *
+from ESPConnectionOldVersion import *
 from multiprocessing import Process, shared_memory
 import keyboard
-# import numpy as np
-# import time
+
 
 class server:
     def __init__(self):
@@ -132,14 +131,13 @@ class server:
         for p in processes:
             p.start()
 
-        for p in processes:
-            p.join()
+        # for p in processes:
+        #     p.join()
 
-        # while True:
-        #     if keyboard.is_pressed("q"):
-        #         for p in processes:
-        #             p.terminate()
-                    # p.close()
+        while True:
+            if keyboard.is_pressed("q"):
+                for p in processes:
+                    p.close()
         self.close_shared_memory()
 
 if __name__=="__main__":

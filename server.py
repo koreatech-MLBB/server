@@ -1,7 +1,7 @@
 from DBConnection import *
-from PoseEstimation import *
+from PoseEstimationOldVersion import *
 from DroneController import *
-from ESPConnection import *
+from ESPConnectionOldVersion import *
 # from threading import Thread, Lock
 from multiprocessing import Process, shared_memory as sm, Lock
 # from multiprocessing import Semaphore
