@@ -3,20 +3,20 @@ from multiprocessing import shared_memory as sm
 import numpy as np
 import cv2
 
-def ESPConnection(shared_frame_name: str, shared_frame_push_idx_name: str, shared_frame_pop_idx_name: str, shared_frame_rotation_idx_name: str, img_size: tuple = (480, 640), serverPort: int = 4703, ip: str = ''):
+def ESPConnection(shared_memories: dict, ip: str, serverPort: str, img_size: tuple):
+        # shared_frame_name: str, shared_frame_push_idx_name: str, shared_frame_pop_idx_name: str, shared_frame_rotation_idx_name: str, img_size: tuple = (480, 640), serverPort: int = 4703, ip: str = ''):
     serverSocket = socket(AF_INET, SOCK_DGRAM)
     serverSocket.bind((ip, serverPort))
     buf_size = img_size[0] * img_size[1] * 3
-    while True:
-        shared_frame_buf = sm.SharedMemory(name=shared_frame_name)
-        shared_frame_pop_idx_buf = sm.SharedMemory(name=shared_frame_pop_idx_name)
-        shared_frame_push_idx_buf = sm.SharedMemory(name=shared_frame_push_idx_name)
-        shared_frame_rotation_idx_buf = sm.SharedMemory(name=shared_frame_rotation_idx_name)
 
-        shared_frame = np.ndarray(shape=(30, 480, 640, 3), dtype=np.uint8, buffer=shared_frame_buf.buf)
-        shared_frame_pop_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_pop_idx_buf.buf)
-        shared_frame_push_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_push_idx_buf.buf)
-        shared_frame_rotation_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_rotation_idx_buf.buf)
+    def make_shared_memory(memories: dict):
+        for name, val in memories.items():
+            yield np.ndarray(shape=val[0], dtype=val[1], buffer=sm.SharedMemory(name=name).buf)
+
+    while True:
+
+        shared_frame, shared_frame_pop_idx, shared_frame_push_idx, shared_frame_rotation_idx = make_shared_memory(memories=shared_memories)
+
         try:
             message, _ = serverSocket.recvfrom(buf_size)
             message = np.frombuffer(message, dtype=np.uint8)

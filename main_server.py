@@ -87,12 +87,13 @@ class server:
                                         "shared_box": [(4, ), np.float64]})
 
     def esp_connection_run(self):
-        ESPConnection(shared_frame="img_shared",
+        ESPConnection(shared_memories={"img_shared": [(30, 480, 640, 3), np.uint8],
+                                        "shared_frame_pop_idx": [(1, ), np.uint8],
+                                        "shared_frame_push_idx": [(1, ), np.uint8],
+                                        "shared_frame_rotation_idx": [(1, ), np.uint8]},
                        img_size=(480, 640),
                        serverPort=4703,
-                       shared_frame_pop_idx="shared_frame_pop_idx",
-                       shared_frame_push_idx="shared_frame_push_idx",
-                       shared_frame_rotation_idx="shared_frame_pop_idx")
+                       ip='')
 
     def drone_controller_run(self):
         dc = DroneController(ssid=self.ssid,
