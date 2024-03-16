@@ -1,48 +1,56 @@
-from PoseVal import pose_val
 from djitellopy import Tello
-import numpy as np
-import math
+
+TOLERANCE_X = 5
+TOLERANCE_Y = 5
+SLOWDOWN_THRESHOLD_X = 20
+SLOWDOWN_THRESHOLD_Y = 20
+DRONE_SPEED_X = 20
+DRONE_SPEED_Y = 20
+SET_POINT_X = 640/2
+SET_POINT_Y = 480/2
+
+
 class DroneController:
-    def __init__(self, ssid: str, password: str, shared_position: np.ndarray, shared_box: np.ndarray, standard_box: int, critical_value: float, img_size: tuple, sensor_size: tuple, subject_height: float):
-        # self.drone = Tello(ssid=ssid, password=password)
+    def __init__(self):
         self.drone = Tello()
         self.drone.connect()
-        self.shared_position = shared_position
-        self.shared_box = shared_box
-        self.standard_box = standard_box
-        self.critical_value = critical_value
-        self.img_size = img_size
-        self.subject_height = subject_height
-        self.sensor_size = sensor_size
-        self.drone_v = 100
-
-    def calc_dist(self):
-        return (self.shared_box[1] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1])
-
-    def calc_move(self):
-        d = self.calc_dist()
-        size_x = (((self.img_size[0] // 2) - self.shared_box[0]) * d) / self.img_size[0]
-        size_y = (self.subject_height * (self.standard_box - self.shared_box[0])) / (self.sensor_size[0] * self.sensor_size[1])
-        size_z = (((self.img_size[1] // 2) - self.shared_box[1]) * d) / self.img_size[1]
-        # vx = self.drone.get_speed_x()
-        # vy = self.drone.get_speed_y()
-        # vz = self.drone.get_speed_z()
-
-        return size_x, size_y, size_z
-
-        # size_x = (((self.img_size[0] // 2) - self.shared_box[0]) * ((self.shared_box[3] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1]))) / self.img_size[0]
-        # size_y = (self.subject_height * (self.standard_box - self.shared_box[3])) / (self.sensor_size[0] * self.sensor_size[1])
-        # size_z = (((self.img_size[1] // 2) - self.shared_box[1]) * ((self.shared_box[3] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1]))) / self.img_size[1]
-        # 
-        # rc_pitch = (math.sqrt((size_x**2) + (size_y**2)) * ((self.shared_box[3] * self.subject_height) / (self.sensor_size[0] * self.sensor_size[1])) * math.sin(math.atan(size_y/size_x))) / (self.drone.t)
-
-    def run(self):
+        print(self.drone.get_battery())
         self.drone.takeoff()
-        try:
-            while True:
-                x, y, z = self.calc_dist()
-                self.drone.go_xyz_speed(x, y, z, self.drone_v)
-        except KeyboardInterrupt as k:
-            print(k)
-        finally:
-            self.drone.land()
+        self.standard_box = 300
+        self.img_size = (640, 480)  # frame
+        self.subject_height = 1.6
+        self.sensor_size = (3.6, 3.6)
+        self.drone_v = 10
+
+    def cal_velocity(self, cx, cy):
+        distanceX = cx - SET_POINT_X
+        distanceY = cy - SET_POINT_Y
+        up_down_velocity, front_back_velocity = 0, 0
+
+        if distanceX < -TOLERANCE_X:
+            front_back_velocity = - DRONE_SPEED_X
+        elif distanceX > TOLERANCE_X:
+            front_back_velocity = DRONE_SPEED_X
+        else:
+            front_back_velocity = 0
+
+        if distanceY < -TOLERANCE_Y:
+            up_down_velocity = DRONE_SPEED_Y
+        elif distanceY > TOLERANCE_Y:
+            up_down_velocity = -DRONE_SPEED_Y
+        else:
+            up_down_velocity = 0
+
+        if abs(distanceX) < SLOWDOWN_THRESHOLD_X:
+            front_back_velocity = front_back_velocity//2
+        if abs(distanceY) < SLOWDOWN_THRESHOLD_Y:
+            up_down_velocity = up_down_velocity//2
+
+        return front_back_velocity, up_down_velocity
+
+    def run(self, cx, cy):
+        front_back_velocity, up_down_velocity = self.cal_velocity(cx, cy)
+        self.drone.send_rc_control(0, front_back_velocity, up_down_velocity, 0)
+
+    def stop(self):
+        self.drone.emergency()
