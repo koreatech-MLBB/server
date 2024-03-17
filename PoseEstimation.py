@@ -135,6 +135,8 @@ def PoseEstimation(shared_memories: dict):
                 if t.track_id == self.track_id:
                     track = t
                     box = track.to_ltrb()
+                    # shared_box = np.array([(box[0] + box[2]) // 2, (box[1] + box[3]) // 2, box[2], box[3]])
+                    np.copyto(shared_box, np.array([(box[0] + box[2]) // 2, (box[1] + box[3]) // 2, box[2], box[3]]))
                     continue
 
             while (not shared_frame_rotation_idx[0] and shared_frame_pop_idx[0] == shared_frame_push_idx[0]):

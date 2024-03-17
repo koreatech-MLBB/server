@@ -1,7 +1,7 @@
 from DBConnection import *
-from PoseEstimationOldVersion import *
-from DroneControllerOldVersion import *
-from ESPConnectionOldVersion import *
+from PoseEstimation import *
+from DroneController import *
+from ESPConnection import *
 from multiprocessing import Process, shared_memory
 import keyboard
 import numpy as np
@@ -96,17 +96,8 @@ class server:
                        ip='')
 
     def drone_controller_run(self):
-        dc = DroneController(ssid=self.ssid,
-                             password=self.password,
-                             shared_position="shared_position",
-                             shared_box="shared_box",
-                             standard_box=300,
-                             critical_value=10,
-                             img_size=self.img_size,
-                             sensor_size=self.sensor_size,
-                             subject_height=self.subject_height)
-
-        dc.run()
+        dc = DroneController(shared_memories={"shared_position": [(33, 4), np.float64],
+                                              "shared_box": [(4, ), np.float64]})
 
     def run(self):
 
@@ -131,11 +122,15 @@ class server:
         # for p in processes:
         #     p.join()
 
-        while True:
-            if keyboard.is_pressed("q"):
-                for p in processes:
-                    p.close()
-        self.close_shared_memory()
+        try:
+            while True:
+                if keyboard.is_pressed("q"):
+                    raise Exception()
+        except BaseException as e:
+            print(f"main_procs: {e.__str__()}")
+            self.close_shared_memory()
+            for p in processes:
+                p.terminate()
 
 if __name__=="__main__":
     main = server()

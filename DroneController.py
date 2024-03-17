@@ -1,4 +1,6 @@
 from djitellopy import Tello
+import numpy as np
+from multiprocessing import shared_memory as sm
 
 TOLERANCE_X = 5
 TOLERANCE_Y = 5
@@ -9,20 +11,19 @@ DRONE_SPEED_Y = 20
 SET_POINT_X = 640/2
 SET_POINT_Y = 480/2
 
+# def DroneController:
+def DroneController(shared_memories: dict):
+    drone = Tello()
+    drone.connect()
+    print(drone.get_battery())
+    drone.takeoff()
+    # standard_box = 300
+    # img_size = (640, 480)  # frame
+    # subject_height = 1.6
+    # sensor_size = (3.6, 3.6)
+    # drone_v = 10
 
-class DroneController:
-    def __init__(self):
-        self.drone = Tello()
-        self.drone.connect()
-        print(self.drone.get_battery())
-        self.drone.takeoff()
-        self.standard_box = 300
-        self.img_size = (640, 480)  # frame
-        self.subject_height = 1.6
-        self.sensor_size = (3.6, 3.6)
-        self.drone_v = 10
-
-    def cal_velocity(self, cx, cy):
+    def cal_velocity(cx, cy):
         distanceX = cx - SET_POINT_X
         distanceY = cy - SET_POINT_Y
         up_down_velocity, front_back_velocity = 0, 0
@@ -42,15 +43,27 @@ class DroneController:
             up_down_velocity = 0
 
         if abs(distanceX) < SLOWDOWN_THRESHOLD_X:
-            front_back_velocity = front_back_velocity//2
+            front_back_velocity = front_back_velocity // 2
         if abs(distanceY) < SLOWDOWN_THRESHOLD_Y:
-            up_down_velocity = up_down_velocity//2
+            up_down_velocity = up_down_velocity // 2
 
         return front_back_velocity, up_down_velocity
 
-    def run(self, cx, cy):
-        front_back_velocity, up_down_velocity = self.cal_velocity(cx, cy)
-        self.drone.send_rc_control(0, front_back_velocity, up_down_velocity, 0)
+    def make_shared_memory(memories: dict):
+        for name, val in memories.items():
+            yield np.ndarray(shape=val[0], dtype=val[1], buffer=sm.SharedMemory(name=name).buf)
 
-    def stop(self):
-        self.drone.emergency()
+    def stop():
+        drone.land()
+        # drone.emergency()
+
+    try:
+    # def run(cx, cy):
+        while True:
+            shared_position, shared_box = make_shared_memory(memories=shared_memories)
+            front_back_velocity, up_down_velocity = cal_velocity(shared_box[0], shared_box[1])
+            drone.send_rc_control(0, front_back_velocity, up_down_velocity, 0)
+    except BaseException as e:
+        # print(e)
+        stop()
+
