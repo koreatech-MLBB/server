@@ -13,7 +13,7 @@ SET_POINT_Y = 480/2
 
 # def DroneController:
 def DroneController(shared_memories: dict):
-    drone = Tello()
+    drone = Tello(host="192.168.4.219")
     drone.connect()
     print(drone.get_battery())
     drone.takeoff()
