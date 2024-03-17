@@ -1,41 +1,62 @@
 from socket import *
-from multiprocessing import shared_memory
+from multiprocessing import shared_memory as sm
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
+import copy
 
 
+def ESPConnection(shared_memories: dict, ip: str, serverPort: str, img_size: tuple):
+    # shared_frame_name: str, shared_frame_push_idx_name: str, shared_frame_pop_idx_name: str, shared_frame_rotation_idx_name: str, img_size: tuple = (480, 640), serverPort: int = 4703, ip: str = ''):
+    serverSocket = socket(AF_INET, SOCK_DGRAM)
+    serverSocket.bind((ip, serverPort))
+    buf_size = img_size[0] * img_size[1] * 3
 
+    # print(f"buf?: {shared_memories}")
 
-import time
-class ESPConnection:
-    def __init__(self, shared_frame: np.ndarray, shared_frame_push_idx: np.ndarray, shared_frame_pop_idx: np.ndarray, shared_frame_rotation_idx: np.ndarray, img_size: tuple = (480, 640), serverPort: int = 4703):
-    # def __init__(self, img_size: tuple = (480, 640), serverPort: int = 27032):
-        # self.serverPort = serverPort
-        self.serverSocket = socket(AF_INET, SOCK_DGRAM)
-        # self.serverSocket.bind(('', self.serverPort))
-        self.serverSocket.bind(('', serverPort))
-        self.shared_frame = shared_frame
-        self.shared_frame_pop_idx = shared_frame_pop_idx
-        self.shared_frame_push_idx = shared_frame_push_idx
-        self.shared_frame_rotation_idx = shared_frame_rotation_idx
-        self.buf_size = img_size[0] * img_size[1] * 3
-    def run(self):
+    try:
         while True:
-            try:
-                message, _ = self.serverSocket.recvfrom(self.buf_size)
-                message = np.frombuffer(message, dtype=np.uint8)
-                image = cv2.imdecode(message, cv2.IMREAD_COLOR)
+            # print("ESPConnection")
+            # shared_frame, shared_frame_pop_idx, shared_frame_push_idx, shared_frame_rotation_idx = make_shared_memory(memories_info=shared_memories)
+            # print(shared_frame_pop_idx.shape, shared_frame_pop_idx[0])
+            # shared_mem_list = [sm.SharedMemory(name=name) for name, val in shared_memories.items()]
+            # shared_mem = {val[0]: np.ndarray(shape=val[1][0], dtype=val[1][1], buffer=shared_mem_list[idx].buf) for idx, val in enumerate(shared_memories.items())}
 
-                while self.shared_frame_rotation_idx[0] and self.shared_frame_pop_idx[0] == self.shared_frame_push_idx[0]:
-                    pass
+            shared_mem_list = []
+            for name, val in shared_memories.items():
+                shm = sm.SharedMemory(name=name)
+                shared_mem_list.append(shm)
 
-                np.copyto(self.shared_frame[self.shared_frame_push_idx[0]], image)
-                if self.shared_frame_pop_idx[0] + 1 >= 30:
-                    self.shared_frame_rotation_idx[0] += 1
-                self.shared_frame_pop_idx[0] = (self.shared_frame_rotation_idx[0] + 1) % 30
-            except Exception as e:
-                print(e)
+            shared_mem = {}
+            for idx, val in enumerate(shared_memories.items()):
+                buf = np.ndarray(shape=val[1][0], dtype=val[1][1], buffer=shared_mem_list[idx].buf)
+                shared_mem[val[0]] = buf
 
-# test = ESPConnection(img_size=(338, 344), serverPort=27033)
-# test.run()
+            message, _ = serverSocket.recvfrom(buf_size)
+            message = np.frombuffer(message, dtype=np.uint8)
+            image = cv2.imdecode(message, 1)
+
+            # cv2.imshow('img', image)
+            # cv2.waitKey(1)
+                # print(image.shape)
+                # print(f"shared_frame_rotation_idx: {shared_frame_pop_idx[0]}")
+                # print(shared_frame_pop_idx, shared_frame_push_idx, shared_frame_rotation_idx)
+                # while shared_frame_rotation_idx[0] and shared_frame_pop_idx[0] == shared_frame_push_idx[0]:
+                #     # print("ESP in while")
+                #     pass
+            # print(shared_mem)
+
+            print(shared_mem["shared_frame_push_idx"][0])
+
+            while shared_mem["shared_frame_rotation_idx"][0] and shared_mem["shared_frame_pop_idx"][0] == shared_mem["shared_frame_push_idx"][0]:
+                pass
+
+            np.copyto(shared_mem["img_shared"][shared_mem["shared_frame_push_idx"][0]], image)
+            # np.copyto(shared_frame[shared_frame_push_idx[0]], image)
+            if shared_mem["shared_frame_push_idx"][0] + 1 >= 30:
+                shared_mem["shared_frame_rotation_idx"][0] = 1
+            shared_mem["shared_frame_push_idx"][0] = (shared_mem["shared_frame_push_idx"][0] + 1) % 30
+
+                # print(f"message: {message}")
+                # print(f"image: {image}")
+    except Exception as e:
+        print(f"esp_error: {e.__str__()}")

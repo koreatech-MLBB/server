@@ -1,0 +1,5 @@
+.venv/
+.idea/
+PoseEstimation_original.py
+__pycache__/
+yolov8_pretrained/*
