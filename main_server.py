@@ -6,6 +6,7 @@ from multiprocessing import Process, shared_memory
 import keyboard
 import numpy as np
 
+
 class server:
     def __init__(self):
 
@@ -26,7 +27,7 @@ class server:
         except FileNotFoundError:
             img_shared_frame = shared_memory.SharedMemory(create=True,
                                                           name="img_shared",
-                                                          size=self.img_size[0] * self.img_size[1] * 3 * 30 * 8)
+                                                          size=self.img_size[0] * self.img_size[1] * 3 * 5 * 8)
         # 이미지 push index 공유 메모리 생성
         try:
             shared_frame_push_idx = shared_memory.SharedMemory(name="shared_frame_push_idx")
@@ -67,6 +68,19 @@ class server:
                                                            name="shared_box",
                                                            size=32)
 
+        # shared_frame_buf = np.ndarray(shape=(5, 480, 640, 3), dtype=np.uint8, buffer=img_shared_frame.buf)
+        shared_frame_rotation_idx_buf = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_rotation_idx.buf)
+        shared_frame_push_idx_buf = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_push_idx.buf)
+        shared_frame_pop_idx_buf = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_pop_idx.buf)
+        # shared_box_memory_buf = np.ndarray(shape=(5, 480, 640, 3), dtype=np.uint8, buffer=img_shared_frame.buf)
+        # shared_position_memory_buf = np.ndarray(shape=(5, 480, 640, 3), dtype=np.uint8, buffer=img_shared_frame.buf)
+
+        shared_frame_pop_idx_buf[0] = 0
+        shared_frame_push_idx_buf[0] = 0
+        shared_frame_rotation_idx_buf[0] = 0
+
+        # print(shared_frame_rotation_idx_buf[0])
+
         self.shared_memories.append(img_shared_frame)
         self.shared_memories.append(shared_frame_rotation_idx)
         self.shared_memories.append(shared_frame_push_idx)
@@ -80,24 +94,24 @@ class server:
 
     def pose_estimation_run(self):
         PoseEstimation(shared_memories={"img_shared": [(30, 480, 640, 3), np.uint8],
-                                        "shared_frame_pop_idx": [(1, ), np.uint8],
-                                        "shared_frame_push_idx": [(1, ), np.uint8],
-                                        "shared_frame_rotation_idx": [(1, ), np.uint8],
+                                        "shared_frame_pop_idx": [(1,), np.uint8],
+                                        "shared_frame_push_idx": [(1,), np.uint8],
+                                        "shared_frame_rotation_idx": [(1,), np.uint8],
                                         "shared_position": [(33, 4), np.float64],
-                                        "shared_box": [(4, ), np.float64]})
+                                        "shared_box": [(4,), np.float64]})
 
     def esp_connection_run(self):
         ESPConnection(shared_memories={"img_shared": [(30, 480, 640, 3), np.uint8],
-                                        "shared_frame_pop_idx": [(1, ), np.uint8],
-                                        "shared_frame_push_idx": [(1, ), np.uint8],
-                                        "shared_frame_rotation_idx": [(1, ), np.uint8]},
-                       img_size=(480, 640),
-                       serverPort=4703,
-                       ip='')
+                                       "shared_frame_pop_idx": [(1,), np.uint8],
+                                       "shared_frame_push_idx": [(1,), np.uint8],
+                                       "shared_frame_rotation_idx": [(1,), np.uint8]},
+                      img_size=(480, 640),
+                      serverPort=3333,
+                      ip='')
 
     def drone_controller_run(self):
-        dc = DroneController(shared_memories={"shared_position": [(33, 4), np.float64],
-                                              "shared_box": [(4, ), np.float64]})
+        DroneController(shared_memories={"shared_position": [(33, 4), np.float64],
+                                         "shared_box": [(4,), np.float64]})
 
     def run(self):
 
@@ -109,12 +123,12 @@ class server:
                              name="esp_connection")
         pe_process = Process(target=self.pose_estimation_run,
                              name="pose_estimation")
-        dc_process = Process(target=self.drone_controller_run,
-                             name="drone_controller")
+        # dc_process = Process(target=self.drone_controller_run,
+        #                      name="drone_controller")
 
         processes.append(ec_process)
         processes.append(pe_process)
-        processes.append(dc_process)
+        # processes.append(dc_process)
 
         for p in processes:
             p.start()
@@ -124,14 +138,23 @@ class server:
 
         try:
             while True:
+
+                # mem = sm.SharedMemory(name="img_shared")
+                # rot = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=self.shared_memories[2].buf)
+                # print(f"in main: {rot[0]}")
+                #
+                # for i in range(5):
+                #     cv2.imshow("main", img[i])
+
                 if keyboard.is_pressed("q"):
-                    raise Exception()
+                    raise Exception("q가 눌림")
         except BaseException as e:
             print(f"main_procs: {e.__str__()}")
-            self.close_shared_memory()
+            # self.close_shared_memory()
             for p in processes:
                 p.terminate()
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     main = server()
     main.run()
