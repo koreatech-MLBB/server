@@ -67,5 +67,15 @@
 #     p1.join()
 #     p2.join()
 
-# l = [[[1, 2, 3], [4, 5, 6]], [2], [3], [4]]
-# print(len(l[0]))
+# def test(l):
+#     return l
+#
+# li = [1, 2, 3]
+# a, b, c = test(li)
+#
+# print(a)
+
+
+d = {'a': [(1, 2, 3, 4), "test"]}
+for idx, val in enumerate(d.items()):
+    print(idx, "+", val[1][0])

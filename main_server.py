@@ -93,7 +93,7 @@ class server:
             sm.close()
 
     def pose_estimation_run(self):
-        PoseEstimation(shared_memories={"img_shared": [(5, 480, 640, 3), np.uint8],
+        PoseEstimation(shared_memories={"img_shared": [(30, 480, 640, 3), np.uint8],
                                         "shared_frame_pop_idx": [(1,), np.uint8],
                                         "shared_frame_push_idx": [(1,), np.uint8],
                                         "shared_frame_rotation_idx": [(1,), np.uint8],
@@ -101,7 +101,7 @@ class server:
                                         "shared_box": [(4,), np.float64]})
 
     def esp_connection_run(self):
-        ESPConnection(shared_memories={"img_shared": [(5, 480, 640, 3), np.uint8],
+        ESPConnection(shared_memories={"img_shared": [(30, 480, 640, 3), np.uint8],
                                        "shared_frame_pop_idx": [(1,), np.uint8],
                                        "shared_frame_push_idx": [(1,), np.uint8],
                                        "shared_frame_rotation_idx": [(1,), np.uint8]},
@@ -121,13 +121,13 @@ class server:
 
         ec_process = Process(target=self.esp_connection_run,
                              name="esp_connection")
-        # pe_process = Process(target=self.pose_estimation_run,
-        #                      name="pose_estimation")
+        pe_process = Process(target=self.pose_estimation_run,
+                             name="pose_estimation")
         # dc_process = Process(target=self.drone_controller_run,
         #                      name="drone_controller")
 
         processes.append(ec_process)
-        # processes.append(pe_process)
+        processes.append(pe_process)
         # processes.append(dc_process)
 
         for p in processes:
@@ -147,7 +147,7 @@ class server:
                 #     cv2.imshow("main", img[i])
 
                 if keyboard.is_pressed("q"):
-                    raise Exception()
+                    raise Exception("q가 눌림")
         except BaseException as e:
             print(f"main_procs: {e.__str__()}")
             # self.close_shared_memory()
