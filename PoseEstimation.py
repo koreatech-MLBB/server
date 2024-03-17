@@ -1,10 +1,14 @@
 import pickle
+from multiprocessing import shared_memory as sm
+
+# import cv2
 import mediapipe as mp
 import numpy as np
 from deep_sort_realtime.deepsort_tracker import DeepSort
 from ultralytics import YOLO
-from multiprocessing import shared_memory as sm, Lock
+
 from PoseVal import hand_val
+
 # import time
 
 CONFIDENCE_THRESHOLD = 0.6
@@ -25,6 +29,8 @@ def PoseEstimation(shared_memories: dict):
 
     tracker = DeepSort()
     track_id = '0'
+
+    print("PoseEstimation")
 
     def calculate_angle(a, b, c):
         a = np.array(a)  # First
@@ -82,8 +88,11 @@ def PoseEstimation(shared_memories: dict):
         return is_open
 
     def make_shared_memory(memories: dict):
+        result = []
         for name, val in memories.items():
-            yield np.ndarray(shape=val[0], dtype=val[1], buffer=sm.SharedMemory(name=name).buf)
+            mem = sm.SharedMemory(name=name)
+            result.append(np.ndarray(shape=val[0], dtype=val[1], buffer=mem.buf))
+        return result
 
     def process(self, previous_frame, track):
         # let = True
@@ -143,18 +152,21 @@ def PoseEstimation(shared_memories: dict):
                 pass
             # 공유 메모리에서 이미지 꺼내기
             frame = np.copy(shared_frame[shared_frame_pop_idx[0]])
+            # cv2.imshow("pose_process", frame)
             if shared_frame_pop_idx[0] + 1 >= 30:
                 shared_frame_rotation_idx[0] -= 1
             shared_frame_pop_idx[0] = (shared_frame_pop_idx[0] + 1) % 30
 
     while True:
-
         shared_frame, shared_frame_pop_idx, shared_frame_push_idx, shared_frame_rotation_idx, shared_position, shared_box = make_shared_memory(memories=shared_memories)
 
         if shared_frame_rotation_idx[0] == 0 and (shared_frame_pop_idx[0] == shared_frame_push_idx[0]):
+            print("Pose in if")
             continue
 
         frame = np.copy(shared_frame[shared_frame_pop_idx[0]])
+
+        # cv2.imshow("pose", frame)
 
         if shared_frame_pop_idx[0] + 1 >= 30:
             shared_frame_rotation_idx[0] = 0

@@ -28,5 +28,5 @@ class ESPConnection:
                 # raise e
         cv2.destroyAllWindows()
 
-test = ESPConnection(img_size=(320, 240), serverPort=3333)
+test = ESPConnection(img_size=(480, 640), serverPort=3333)
 test.run()

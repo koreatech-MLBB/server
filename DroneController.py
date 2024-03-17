@@ -50,8 +50,11 @@ def DroneController(shared_memories: dict):
         return front_back_velocity, up_down_velocity
 
     def make_shared_memory(memories: dict):
+        result = []
         for name, val in memories.items():
-            yield np.ndarray(shape=val[0], dtype=val[1], buffer=sm.SharedMemory(name=name).buf)
+            mem = sm.SharedMemory(name=name)
+            result.append(np.ndarray(shape=val[0], dtype=val[1], buffer=mem.buf))
+        return result
 
     def stop():
         drone.land()
@@ -62,8 +65,9 @@ def DroneController(shared_memories: dict):
         while True:
             shared_position, shared_box = make_shared_memory(memories=shared_memories)
             front_back_velocity, up_down_velocity = cal_velocity(shared_box[0], shared_box[1])
+            print(f"drone_controller: {front_back_velocity}, {up_down_velocity}")
             drone.send_rc_control(0, front_back_velocity, up_down_velocity, 0)
     except BaseException as e:
-        # print(e)
+        print(e.__str__())
         stop()
 
