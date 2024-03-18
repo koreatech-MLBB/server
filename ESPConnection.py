@@ -15,7 +15,7 @@ def ESPConnection(shared_memories: dict, ip: str, serverPort: str, img_size: tup
 
     try:
         while True:
-            # print("ESPConnection")
+            print("ESPConnection")
             # shared_frame, shared_frame_pop_idx, shared_frame_push_idx, shared_frame_rotation_idx = make_shared_memory(memories_info=shared_memories)
             # print(shared_frame_pop_idx.shape, shared_frame_pop_idx[0])
             # shared_mem_list = [sm.SharedMemory(name=name) for name, val in shared_memories.items()]
@@ -45,18 +45,25 @@ def ESPConnection(shared_memories: dict, ip: str, serverPort: str, img_size: tup
                 #     pass
             # print(shared_mem)
 
-            print(shared_mem["shared_frame_push_idx"][0])
+            print(f"shared_mem_push_idx: {shared_mem['shared_frame_push_idx'][0]}")
 
-            while shared_mem["shared_frame_rotation_idx"][0] and shared_mem["shared_frame_pop_idx"][0] == shared_mem["shared_frame_push_idx"][0]:
-                pass
+            if shared_mem["shared_frame_rotation_idx"][0] and shared_mem["shared_frame_pop_idx"][0] == shared_mem["shared_frame_push_idx"][0]:
+                for idx in range(1, 4):
+                    shared_mem_list[idx].close()
+                continue
 
             np.copyto(shared_mem["img_shared"][shared_mem["shared_frame_push_idx"][0]], image)
             # np.copyto(shared_frame[shared_frame_push_idx[0]], image)
-            if shared_mem["shared_frame_push_idx"][0] + 1 >= 30:
+            if shared_mem["shared_frame_push_idx"][0] + 1 >= 5:
                 shared_mem["shared_frame_rotation_idx"][0] = 1
-            shared_mem["shared_frame_push_idx"][0] = (shared_mem["shared_frame_push_idx"][0] + 1) % 30
+            shared_mem["shared_frame_push_idx"][0] = (shared_mem["shared_frame_push_idx"][0] + 1) % 5
+
+            # for idx in range(1, 4):
+            #     shared_mem_list[idx]
 
                 # print(f"message: {message}")
                 # print(f"image: {image}")
     except Exception as e:
         print(f"esp_error: {e.__str__()}")
+
+

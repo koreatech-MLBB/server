@@ -325,8 +325,7 @@ class PoseEstimation:
             #     self.shared_frame_rotation_idx[0] -= 1
             # self.shared_frame_pop_idx[0] = (self.shared_frame_pop_idx[0] + 1) % 30
             #
-            while (not shared_frame_rotation_idx[0]
-                   and shared_frame_pop_idx[0] == shared_frame_push_idx[0]):
+            while (not shared_frame_rotation_idx[0] and shared_frame_pop_idx[0] == shared_frame_push_idx[0]):
                 pass
             # 공유 메모리에서 이미지 꺼내기
             frame = np.copy(shared_frame[shared_frame_pop_idx[0]])

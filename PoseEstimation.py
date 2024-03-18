@@ -112,8 +112,9 @@ def PoseEstimation(shared_memories: dict):
 
             shared_mem = {}
             for idx, val in enumerate(shared_memories.items()):
-                buf = np.ndarray(shape=val[1][0], dtype=val[1][1], buffer=shared_mem_list[idx].buf)
-                shared_mem[val[0]] = buf
+                if val[0] != "img_shared":
+                    buf = np.ndarray(shape=val[1][0], dtype=val[1][1], buffer=shared_mem_list[idx].buf)
+                    shared_mem[val[0]] = buf
 
             landmark_buf = []
 
@@ -127,16 +128,21 @@ def PoseEstimation(shared_memories: dict):
             np.copyto(shared_mem["shared_box"], np.array([xmin + xmax/2, ymin + ymin/2, xmax, ymax]))
 
             if human_box.size != 0:
-                body = mp.solutions.pose.Pose().process(human_box)
+                body = mp.solutions.pose.Pose().process(frame)
                 # print(type(body))
-                for landmark in body.pose_landmarks.landmark:
-                    landmark_buf.append(landmark.x)
-                    landmark_buf.append(landmark.y)
-                    landmark_buf.append(landmark.z)
-                    landmark_buf.append(landmark.visibility)
-                landmark_buf = np.reshape(landmark_buf, (33, -1))
+                try:
+                    for landmark in body.pose_landmarks.landmark:
+                        landmark_buf.append(landmark.x)
+                        landmark_buf.append(landmark.y)
+                        landmark_buf.append(landmark.z)
+                        landmark_buf.append(landmark.visibility)
+                    landmark_buf = np.reshape(landmark_buf, (33, -1))
 
-                np.copyto(shared_mem["shared_position"], landmark_buf)
+                    np.copyto(shared_mem["shared_position"], landmark_buf)
+
+
+                except BaseException as e:
+                    print(f"no body!!!    {e.__str__()}")
 
             # print(shared_frame_pop_idx, shared_frame_push_idx, shared_frame_rotation_idx)
 
@@ -156,22 +162,35 @@ def PoseEstimation(shared_memories: dict):
                 if t.track_id == track_id:
                     track = t
                     box = track.to_ltrb()
+                    xmin, ymin, xmax, ymax = map(int, [x for x in box])
                     # shared_box = np.array([(box[0] + box[2]) // 2, (box[1] + box[3]) // 2, box[2], box[3]])
                     np.copyto(shared_mem["shared_box"], np.array([(box[0] + box[2]) // 2, (box[1] + box[3]) // 2, box[2], box[3]]))
+
+                    cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), GREEN, BOLD)
+                    cv2.imshow("pose", frame)
+                    cv2.waitKey(1)
+
                     continue
 
-            if shared_mem["shared_frame_rotation_idx"][0] == 0 and (
-                    shared_mem["shared_frame_pop_idx"][0] == shared_mem["shared_frame_push_idx"][0]):
+            if shared_mem["shared_frame_rotation_idx"][0] == 0 and (shared_mem["shared_frame_pop_idx"][0] == shared_mem["shared_frame_push_idx"][0]):
                 # print("Pose in if")
+                for idx in range(1, 4):
+                    shared_mem_list[idx].close()
                 continue
             # 공유 메모리에서 이미지 꺼내기
-            frame = np.copy(shared_mem["img_shared"][shared_mem["shared_frame_pop_idx"][0]])
-            # cv2.imshow("pose", frame)
-            if shared_mem["shared_frame_pop_idx"][0] + 1 >= 30:
+            # frame = np.copy(shared_mem["img_shared"][shared_mem["shared_frame_pop_idx"][0]])
+            frame = np.frombuffer(buffer=shared_mem_list[0].buf, dtype=np.uint8, count=640 * 480 * 3, offset=640 * 480 * 3 * shared_mem["shared_frame_pop_idx"][0])
+            frame = np.reshape(frame, (480, 640, 3))
+
+            if shared_mem["shared_frame_pop_idx"][0] + 1 >= 5:
                 shared_mem["shared_frame_rotation_idx"][0] = 0
-            shared_mem["shared_frame_pop_idx"][0] = (shared_mem["shared_frame_pop_idx"][0] + 1) % 30
+            shared_mem["shared_frame_pop_idx"][0] = (shared_mem["shared_frame_pop_idx"][0] + 1) % 5
+
+            for idx in range(1, 4):
+                shared_mem_list[idx].close()
 
     while True:
+        print("PoseEstimation")
         # shared_frame, shared_frame_pop_idx, shared_frame_push_idx, shared_frame_rotation_idx, shared_position, shared_box = make_shared_memory(memories=shared_memories)
 
         shared_mem_list = []
@@ -181,21 +200,28 @@ def PoseEstimation(shared_memories: dict):
 
         shared_mem = {}
         for idx, val in enumerate(shared_memories.items()):
-            buf = np.ndarray(shape=val[1][0], dtype=val[1][1], buffer=shared_mem_list[idx].buf)
-            shared_mem[val[0]] = buf
+            if val[0] != "img_shared":
+                buf = np.ndarray(shape=val[1][0], dtype=val[1][1], buffer=shared_mem_list[idx].buf)
+                shared_mem[val[0]] = buf
 
         if (shared_mem["shared_frame_pop_idx"][0] == shared_mem["shared_frame_push_idx"][0]) and shared_mem["shared_frame_rotation_idx"][0] == 0:
-            # print("Pose in if")
+            for idx in range(1, 4):
+                shared_mem_list[idx].close()
             continue
 
-        frame = np.copy(shared_mem["img_shared"][shared_mem["shared_frame_pop_idx"][0]])
+        # frame = np.copy(shared_mem["img_shared"][shared_mem["shared_frame_pop_idx"][0]])
+        frame = np.frombuffer(buffer=shared_mem_list[0].buf, dtype=np.uint8, count=640 * 480 * 3, offset=640*480*3*shared_mem["shared_frame_pop_idx"][0])
+        frame = np.reshape(frame, (480, 640, 3))
 
         cv2.imshow("pose", frame)
         cv2.waitKey(1)
 
-        if shared_mem["shared_frame_pop_idx"][0] + 1 >= 30:
+        if shared_mem["shared_frame_pop_idx"][0] + 1 >= 5:
             shared_mem["shared_frame_rotation_idx"][0] = 0
-        shared_mem["shared_frame_pop_idx"][0] = (shared_mem["shared_frame_pop_idx"][0] + 1) % 30
+        shared_mem["shared_frame_pop_idx"][0] = (shared_mem["shared_frame_pop_idx"][0] + 1) % 5
+
+        for idx in range(1, 4):
+            shared_mem_list[idx].close()
 
         detection = model.predict(source=[frame])[0]
         results = []
@@ -220,10 +246,10 @@ def PoseEstimation(shared_memories: dict):
             track_id: str = track.track_id
             box = track.to_ltrb()  # (min x, min y, max x, max y)
             human_box = frame[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
-            xmin, ymin, xmax, ymax = map(int, [human_box[0], human_box[1], human_box[2], human_box[3]])
+            # xmin, ymin, xmax, ymax = map(int, [human_box[0], human_box[1], human_box[2], human_box[3]])
 
             # NOTE: shared_box
-            shared_box = [xmin + xmax / 2, ymin + ymax / 2, xmax, ymax]
+            shared_box = [int(box[0]) + int(box[2]) / 2, int(box[1]) + int(box[3]) / 2, int(box[2]), int(box[3])]
 
             if human_box.size == 0:
                 continue
@@ -240,3 +266,5 @@ def PoseEstimation(shared_memories: dict):
                         process(frame, track)
                         return
 
+        # for s in shared_mem_list:
+        #     s.close()
