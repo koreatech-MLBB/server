@@ -1,5 +1,5 @@
 import pickle
-from multiprocessing import shared_memory as sm
+from multiprocessing import shared_memory as sm, Semaphore
 
 import cv2
 import mediapipe as mp
@@ -9,7 +9,6 @@ from ultralytics import YOLO
 
 from PoseVal import hand_val
 
-# import time
 
 CONFIDENCE_THRESHOLD = 0.6
 GREEN = (0, 255, 0)
@@ -23,37 +22,33 @@ BOLD = 2
 model = YOLO('./yolov8_pretrained/yolov8n.pt')
 
 
-def PoseEstimation(shared_memories: dict):
-    tracker = DeepSort()
-    track_id = '0'
+def calculate_distance(a, b):
+    a = np.array(a)
+    b = np.array(b)
+    distance = np.linalg.norm(a - b)
+    return distance
 
-    print("PoseEstimation")
 
-    def calculate_distance(a, b):
-        a = np.array(a)
-        b = np.array(b)
-        distance = np.linalg.norm(a - b)
-        return distance
+def serialize_hand_landmarks(multi_hand_landmarks):
+    serialized_data = []
+    if multi_hand_landmarks:
+        for hand_landmarks in multi_hand_landmarks:
+            hand_data = []
+            for landmark in hand_landmarks.landmark:
+                # 각 랜드마크의 x, y, z 좌표와 visibility를 딕셔너리 형태로 저장
+                hand_data.append({
+                    'x': landmark.x,
+                    'y': landmark.y,
+                    'z': landmark.z,
+                    'visibility': landmark.visibility
+                })
+            serialized_data.append(hand_data)
+    else:
+        return multi_hand_landmarks
+    return serialized_data
 
-    def serialize_hand_landmarks(multi_hand_landmarks):
-        serialized_data = []
-        if multi_hand_landmarks:
-            for hand_landmarks in multi_hand_landmarks:
-                hand_data = []
-                for landmark in hand_landmarks.landmark:
-                    # 각 랜드마크의 x, y, z 좌표와 visibility를 딕셔너리 형태로 저장
-                    hand_data.append({
-                        'x': landmark.x,
-                        'y': landmark.y,
-                        'z': landmark.z,
-                        'visibility': landmark.visibility
-                    })
-                serialized_data.append(hand_data)
-        else:
-            return multi_hand_landmarks
-        return serialized_data
 
-    def hand_signal_seri(landmarks, hand_value):
+def hand_signal_seri(landmarks, hand_value):
         open_hand_count = 0
 
         w, thumb = landmarks[hand_value['WRIST']], landmarks[hand_value['THUMB_TIP']]
@@ -70,28 +65,38 @@ def PoseEstimation(shared_memories: dict):
         is_open = open_hand_count >= 3
         return is_open
 
+
+def PoseEstimation(shared_memories: dict, sem: Semaphore):
+    tracker = DeepSort()
+    track_id = '0'
+
+    print("PoseEstimation")
+
     def process(previous_frame, track):
         frame = previous_frame
         box = track.to_ltrb()
 
         while True:
-            shared_mem_list = []
-            for name, val in shared_memories.items():
-                shm = sm.SharedMemory(name=name)
-                shared_mem_list.append(shm)
+            with sem:
+                shared_mem_list = []
+                for name, val in shared_memories.items():
+                    shm = sm.SharedMemory(name=name)
+                    shared_mem_list.append(shm)
 
-            shared_mem = {}
-            for idx, val in enumerate(shared_memories.items()):
-                buf = np.ndarray(shape=val[1][0], dtype=val[1][1], buffer=shared_mem_list[idx].buf)
-                shared_mem[val[0]] = buf
+                shared_mem = {}
+                for idx, val in enumerate(shared_memories.items()):
+                    buf = np.ndarray(shape=val[1][0], dtype=val[1][1], buffer=shared_mem_list[idx].buf)
+                    shared_mem[val[0]] = buf
+
+                # 공유 메모리에서 이미지 꺼내고 닫기
+                frame_p = np.copy(shared_mem["img_shared"][shared_mem["shared_frame_pop_idx"][0] % 30])
+                shared_mem["shared_frame_pop_idx"][0] = (shared_mem["shared_frame_pop_idx"][0] + 1) % 60
 
             landmark_buf = []
 
-            # box = track.to_ltrb()  # (min x, min y, max x, max y)
             detection = model.predict(source=[frame])[0]
             xmin, ymin, xmax, ymax = map(int, [box[0], box[1], box[2], box[3]])
             human_box = frame[ymin:ymax, xmin:xmax]
-            # xmin, ymin, xmax, ymax = map(int, [human_box[0], human_box[1], human_box[2], human_box[3]])
 
             # shared_box 값 저장 및 메모리 닫기 (cx, cy)
             np.copyto(shared_mem["shared_box"], np.array([xmin + xmax / 2, ymin + ymin / 2, xmax, ymax]))
@@ -117,7 +122,6 @@ def PoseEstimation(shared_memories: dict):
                 confidence, label = float(data[4]), int(data[5])
                 if confidence < CONFIDENCE_THRESHOLD or label != 0:
                     continue
-
                 xmin, ymin, xmax, ymax = map(int, [x for x in data[:4]])
                 results.append([[xmin, ymin, xmax - xmin, ymax - ymin], confidence, label])
 
@@ -128,57 +132,31 @@ def PoseEstimation(shared_memories: dict):
                     box = track.to_ltrb()
                     np.copyto(shared_mem["shared_box"],
                               np.array([(box[0] + box[2]) // 2, (box[1] + box[3]) // 2, box[2], box[3]]))
-                    shared_mem_list[4].close()
                     continue
-
-            check = abs(shared_mem["shared_frame_pop_idx"][0] - shared_mem["shared_frame_push_idx"][0])
-            if check == 0 or check == 30:
-                for smem in shared_mem_list:
-                    smem.close()
-                continue
-
-            # 공유 메모리에서 이미지 꺼내고 닫기
-            frame_p = np.copy(shared_mem["img_shared"][shared_mem["shared_frame_pop_idx"][0] % 30])
-            shared_mem_list[0].close()
 
             cv2.imshow("pose", frame_p)
             cv2.waitKey(1)
 
-            shared_mem["shared_frame_pop_idx"][0] = (shared_mem["shared_frame_pop_idx"][0] + 1) % 60
-
     while True:
-        # print("POSEConnetion")
-        shared_mem_list = []
-        for name, val in shared_memories.items():
-            shm = sm.SharedMemory(name=name)
-            shared_mem_list.append(shm)
+        with sem:
+            print("POSEConnetion")
+            shared_mem_list = []
+            for name, val in shared_memories.items():
+                shm = sm.SharedMemory(name=name)
+                shared_mem_list.append(shm)
 
-        shared_mem = {}
-        for idx, val in enumerate(shared_memories.items()):
-            buf = np.ndarray(shape=val[1][0], dtype=val[1][1], buffer=shared_mem_list[idx].buf)
-            shared_mem[val[0]] = buf
+            shared_mem = {}
+            for idx, val in enumerate(shared_memories.items()):
+                buf = np.ndarray(shape=val[1][0], dtype=val[1][1], buffer=shared_mem_list[idx].buf)
+                shared_mem[val[0]] = buf
 
-        print(f"POSE-POP: {shared_mem['shared_frame_pop_idx'][0]}")
+            print(f"POSE-POP: {shared_mem['shared_frame_pop_idx'][0]}")
 
-        check = shared_mem["shared_frame_push_idx"][0] - shared_mem["shared_frame_pop_idx"][0]
-        print(f"check -pose : {check}")
-        if check == -60:
-            for smem in shared_mem_list:
-                smem.close()
-            continue
+            frame = np.copy(shared_mem["img_shared"][shared_mem["shared_frame_pop_idx"][0]])
+            shared_mem["shared_frame_pop_idx"][0] = (shared_mem["shared_frame_pop_idx"][0] + 1) % 30
 
-        # frame = np.frombuffer(buffer=shared_mem_list[0].buf, dtype=np.uint8, count=480 * 640 * 3,
-        #                       offset=480 * 640 * 3 * shared_mem["shared_frame_pop_idx"][0])
-        # frame = np.reshape(frame, (480, 640, 3))
-
-        frame = np.copy(shared_mem["img_shared"][shared_mem["shared_frame_pop_idx"][0] % 30])
-        shared_mem_list[0].close()
-
-        cv2.imshow("pose-hand", frame)
-        cv2.waitKey(1)
-
-        shared_mem["shared_frame_pop_idx"][0] = (shared_mem["shared_frame_pop_idx"][0] + 1) % 60
-        shared_mem_list[1].close()
+            cv2.imshow("pose-hand", frame)
+            cv2.waitKey(1)
 
         detection = model.predict(source=[frame])[0]
         results = []

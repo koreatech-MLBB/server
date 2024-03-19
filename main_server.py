@@ -1,6 +1,6 @@
 # from DBConnection import *
 
-from multiprocessing import Process, shared_memory
+from multiprocessing import Process, shared_memory, Semaphore
 
 import keyboard
 import numpy as np
@@ -21,6 +21,8 @@ class server:
         self.subject_height = 1.8
         # shared_memories
         self.shared_memories = []
+        # semaphore
+        self.sem = Semaphore(3)
 
     def init_shared_memory(self):
         print("Initialize shared memories")
@@ -44,13 +46,6 @@ class server:
             shared_frame_pop_idx = shared_memory.SharedMemory(create=True,
                                                               name="shared_frame_pop_idx",
                                                               size=1)
-        # 이미지 push/pop index 상태 공유 메모리 생성
-        try:
-            shared_frame_rotation_idx = shared_memory.SharedMemory(name="shared_frame_rotation_idx")
-        except FileNotFoundError:
-            shared_frame_rotation_idx = shared_memory.SharedMemory(create=True,
-                                                                   name="shared_frame_rotation_idx",
-                                                                   size=1)
         # position 공유 메모리 생성
         try:
             shared_position_memory = shared_memory.SharedMemory(name="shared_position")
@@ -66,11 +61,10 @@ class server:
                                                            name="shared_box",
                                                            size=32)
 
-        shared_frame_push_idx_buf = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_push_idx.buf)
-        shared_frame_pop_idx_buf = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_pop_idx.buf)
-
+        shared_frame_push_idx_buf = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_push_idx.buf)
+        shared_frame_pop_idx_buf = np.ndarray(shape=(1,), dtype=np.uint8, buffer=shared_frame_pop_idx.buf)
         shared_frame_pop_idx_buf[0] = 0
-        shared_frame_push_idx_buf[0] = 0
+        shared_frame_push_idx_buf[0] = 1
 
         self.shared_memories.append(img_shared_frame)
         self.shared_memories.append(shared_frame_push_idx)
@@ -87,19 +81,22 @@ class server:
                                         "shared_frame_pop_idx": [(1,), np.uint8],
                                         "shared_frame_push_idx": [(1,), np.uint8],
                                         "shared_position": [(33, 4), np.float64],
-                                        "shared_box": [(4,), np.float64]})
+                                        "shared_box": [(4,), np.float64]},
+                       sem=self.sem)
 
     def esp_connection_run(self):
         ESPConnection(shared_memories={"img_shared": [(30, 480, 640, 3), np.uint8],
                                        "shared_frame_pop_idx": [(1,), np.uint8],
                                        "shared_frame_push_idx": [(1,), np.uint8]},
+                      sem=self.sem,
                       img_size=(480, 640),
                       serverPort=3333,
                       ip='')
 
     def drone_controller_run(self):
         DroneController(shared_memories={"shared_position": [(33, 4), np.float64],
-                                         "shared_box": [(4,), np.float64]})
+                                         "shared_box": [(4,), np.float64]},
+                        sem=self.sem)
 
     def run(self):
         self.init_shared_memory()
@@ -108,19 +105,19 @@ class server:
         ec_process = Process(target=self.esp_connection_run,
                              name="esp_connection",
                              daemon=True)
-
         pe_process = Process(target=self.pose_estimation_run,
                              name="pose_estimation")
-
         # dc_process = Process(target=self.drone_controller_run,
         #                      name="drone_controller")
 
-        processes.append(pe_process)
+
         processes.append(ec_process)
+        processes.append(pe_process)
         # processes.append(dc_process)
 
         for p in processes:
             p.start()
+
 
         # for p in processes:
         #     p.join()

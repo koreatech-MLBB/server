@@ -55,7 +55,6 @@ def func2(names, sem):
             pop_buf = sm.SharedMemory(name=names[2])
             pop_idx = np.ndarray(shape=(1,), dtype=np.uint8, buffer=pop_buf.buf)
 
-            # np.copyto(frame_mem[push_idx[0] % 30][:], image)
             frame_mem[push_idx[0] % 30][:] = image
             push_idx[0] = (push_idx[0] + 1) % 60
         종료 = time.time()
