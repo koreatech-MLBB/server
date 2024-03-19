@@ -1,23 +1,25 @@
 # from DBConnection import *
-from PoseEstimation import *
-from DroneController import *
-from ESPConnection import *
+
 from multiprocessing import Process, shared_memory
+
 import keyboard
 import numpy as np
+
+from DroneController import *
+from ESPConnection import *
+from PoseEstimation import *
 
 
 class server:
     def __init__(self):
-
+        # frame
         self.img_size = (480, 640)
-
         # drone
         self.ssid = ""
         self.password = ""
         self.sensor_size = (3.6, 3.6)
         self.subject_height = 1.8
-
+        # shared_memories
         self.shared_memories = []
 
     def init_shared_memory(self):
@@ -35,7 +37,6 @@ class server:
             shared_frame_push_idx = shared_memory.SharedMemory(create=True,
                                                                name="shared_frame_push_idx",
                                                                size=1)
-
         # 이미지 pop index 공유 메모리 생성
         try:
             shared_frame_pop_idx = shared_memory.SharedMemory(name="shared_frame_pop_idx")
@@ -43,7 +44,6 @@ class server:
             shared_frame_pop_idx = shared_memory.SharedMemory(create=True,
                                                               name="shared_frame_pop_idx",
                                                               size=1)
-
         # 이미지 push/pop index 상태 공유 메모리 생성
         try:
             shared_frame_rotation_idx = shared_memory.SharedMemory(name="shared_frame_rotation_idx")
@@ -51,7 +51,6 @@ class server:
             shared_frame_rotation_idx = shared_memory.SharedMemory(create=True,
                                                                    name="shared_frame_rotation_idx",
                                                                    size=1)
-
         # position 공유 메모리 생성
         try:
             shared_position_memory = shared_memory.SharedMemory(name="shared_position")
@@ -59,7 +58,6 @@ class server:
             shared_position_memory = shared_memory.SharedMemory(create=True,
                                                                 name="shared_position",
                                                                 size=1056)
-
         # YOLO-box 공유 메모리 생성
         try:
             shared_box_memory = shared_memory.SharedMemory(name="shared_box")
@@ -68,21 +66,13 @@ class server:
                                                            name="shared_box",
                                                            size=32)
 
-        # shared_frame_buf = np.ndarray(shape=(5, 480, 640, 3), dtype=np.uint8, buffer=img_shared_frame.buf)
-        shared_frame_rotation_idx_buf = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_rotation_idx.buf)
         shared_frame_push_idx_buf = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_push_idx.buf)
         shared_frame_pop_idx_buf = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=shared_frame_pop_idx.buf)
-        # shared_box_memory_buf = np.ndarray(shape=(5, 480, 640, 3), dtype=np.uint8, buffer=img_shared_frame.buf)
-        # shared_position_memory_buf = np.ndarray(shape=(5, 480, 640, 3), dtype=np.uint8, buffer=img_shared_frame.buf)
 
         shared_frame_pop_idx_buf[0] = 0
         shared_frame_push_idx_buf[0] = 0
-        shared_frame_rotation_idx_buf[0] = 0
-
-        # print(shared_frame_rotation_idx_buf[0])
 
         self.shared_memories.append(img_shared_frame)
-        self.shared_memories.append(shared_frame_rotation_idx)
         self.shared_memories.append(shared_frame_push_idx)
         self.shared_memories.append(shared_frame_pop_idx)
         self.shared_memories.append(shared_box_memory)
@@ -96,15 +86,13 @@ class server:
         PoseEstimation(shared_memories={"img_shared": [(30, 480, 640, 3), np.uint8],
                                         "shared_frame_pop_idx": [(1,), np.uint8],
                                         "shared_frame_push_idx": [(1,), np.uint8],
-                                        "shared_frame_rotation_idx": [(1,), np.uint8],
                                         "shared_position": [(33, 4), np.float64],
                                         "shared_box": [(4,), np.float64]})
 
     def esp_connection_run(self):
         ESPConnection(shared_memories={"img_shared": [(30, 480, 640, 3), np.uint8],
                                        "shared_frame_pop_idx": [(1,), np.uint8],
-                                       "shared_frame_push_idx": [(1,), np.uint8],
-                                       "shared_frame_rotation_idx": [(1,), np.uint8]},
+                                       "shared_frame_push_idx": [(1,), np.uint8]},
                       img_size=(480, 640),
                       serverPort=3333,
                       ip='')
@@ -114,20 +102,21 @@ class server:
                                          "shared_box": [(4,), np.float64]})
 
     def run(self):
-
         self.init_shared_memory()
-
         processes = []
 
         ec_process = Process(target=self.esp_connection_run,
-                             name="esp_connection")
+                             name="esp_connection",
+                             daemon=True)
+
         pe_process = Process(target=self.pose_estimation_run,
                              name="pose_estimation")
+
         # dc_process = Process(target=self.drone_controller_run,
         #                      name="drone_controller")
 
-        processes.append(ec_process)
         processes.append(pe_process)
+        processes.append(ec_process)
         # processes.append(dc_process)
 
         for p in processes:
@@ -138,19 +127,10 @@ class server:
 
         try:
             while True:
-
-                # mem = sm.SharedMemory(name="img_shared")
-                # rot = np.ndarray(shape=(1, ), dtype=np.uint8, buffer=self.shared_memories[2].buf)
-                # print(f"in main: {rot[0]}")
-                #
-                # for i in range(5):
-                #     cv2.imshow("main", img[i])
-
                 if keyboard.is_pressed("q"):
                     raise Exception("q가 눌림")
         except BaseException as e:
             print(f"main_procs: {e.__str__()}")
-            # self.close_shared_memory()
             for p in processes:
                 p.terminate()
 
