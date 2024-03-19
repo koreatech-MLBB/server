@@ -48,8 +48,8 @@ def ESPConnection(shared_memories: dict, ip: str, serverPort: str, img_size: tup
             print(f"shared_mem_push_idx: {shared_mem['shared_frame_push_idx'][0]}")
 
             if shared_mem["shared_frame_rotation_idx"][0] and shared_mem["shared_frame_pop_idx"][0] == shared_mem["shared_frame_push_idx"][0]:
-                for idx in range(1, 4):
-                    shared_mem_list[idx].close()
+                for shm in shared_mem_list:
+                    shm.close()
                 continue
 
             np.copyto(shared_mem["img_shared"][shared_mem["shared_frame_push_idx"][0]], image)
@@ -60,7 +60,8 @@ def ESPConnection(shared_memories: dict, ip: str, serverPort: str, img_size: tup
 
             # for idx in range(1, 4):
             #     shared_mem_list[idx]
-
+            for shm in shared_mem_list:
+                shm.close()
                 # print(f"message: {message}")
                 # print(f"image: {image}")
     except Exception as e:

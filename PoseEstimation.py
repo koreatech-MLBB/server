@@ -1,3 +1,4 @@
+import copy
 import pickle
 from multiprocessing import shared_memory as sm
 
@@ -174,8 +175,8 @@ def PoseEstimation(shared_memories: dict):
 
             if shared_mem["shared_frame_rotation_idx"][0] == 0 and (shared_mem["shared_frame_pop_idx"][0] == shared_mem["shared_frame_push_idx"][0]):
                 # print("Pose in if")
-                for idx in range(1, 4):
-                    shared_mem_list[idx].close()
+                for shm in shared_mem_list:
+                    shm.close()
                 continue
             # 공유 메모리에서 이미지 꺼내기
             # frame = np.copy(shared_mem["img_shared"][shared_mem["shared_frame_pop_idx"][0]])
@@ -186,8 +187,8 @@ def PoseEstimation(shared_memories: dict):
                 shared_mem["shared_frame_rotation_idx"][0] = 0
             shared_mem["shared_frame_pop_idx"][0] = (shared_mem["shared_frame_pop_idx"][0] + 1) % 5
 
-            for idx in range(1, 4):
-                shared_mem_list[idx].close()
+            for shm in shared_mem_list:
+                shm.close()
 
     while True:
         print("PoseEstimation")
@@ -205,12 +206,13 @@ def PoseEstimation(shared_memories: dict):
                 shared_mem[val[0]] = buf
 
         if (shared_mem["shared_frame_pop_idx"][0] == shared_mem["shared_frame_push_idx"][0]) and shared_mem["shared_frame_rotation_idx"][0] == 0:
-            for idx in range(1, 4):
-                shared_mem_list[idx].close()
+            for shm in shared_mem_list:
+                shm.close()
             continue
 
         # frame = np.copy(shared_mem["img_shared"][shared_mem["shared_frame_pop_idx"][0]])
-        frame = np.frombuffer(buffer=shared_mem_list[0].buf, dtype=np.uint8, count=640 * 480 * 3, offset=640*480*3*shared_mem["shared_frame_pop_idx"][0])
+        # frame =
+        frame = copy.deepcopy(np.frombuffer(buffer=shared_mem_list[0].buf, dtype=np.uint8, count=640 * 480 * 3, offset=640*480*3*shared_mem["shared_frame_pop_idx"][0]))
         frame = np.reshape(frame, (480, 640, 3))
 
         cv2.imshow("pose", frame)
@@ -220,8 +222,8 @@ def PoseEstimation(shared_memories: dict):
             shared_mem["shared_frame_rotation_idx"][0] = 0
         shared_mem["shared_frame_pop_idx"][0] = (shared_mem["shared_frame_pop_idx"][0] + 1) % 5
 
-        for idx in range(1, 4):
-            shared_mem_list[idx].close()
+        for shm in shared_mem_list:
+            shm.close()
 
         detection = model.predict(source=[frame])[0]
         results = []
